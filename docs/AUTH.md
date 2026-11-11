@@ -538,8 +538,10 @@ its owner does, and a suspended owner's tokens are refused.
   sessions as the token's owner; reading automations and skills; creating and triggering
   automations; and importing skills. A token prompt is authored by the owner, as one from the
   browser would be. Its prompts use the owner's personal MCP connections only with
-  `mcp_connections.use` in the grant. A token without `memories.manage_own` starts sessions without
-  the owner's personal memory and cannot prompt a session that includes anyone's personal memory.
+  `mcp_connections.use` in the grant. That is checked when the prompt is accepted, so revoking the
+  token does not stop work already queued or running with it, its retries, or the child sessions it
+  spawned; stop those sessions. A token without `memories.manage_own` starts sessions without the
+  owner's personal memory and cannot prompt a session that includes anyone's personal memory.
 - Workspace management permissions (members, roles, secrets, integrations, and settings) are
   withheld from tokens, and the token routes accept only a browser session, so a token can never
   issue or revoke tokens. A token's `skills.manage` also needs `skills.read`.
