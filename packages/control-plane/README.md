@@ -788,7 +788,11 @@ pins this list, so adding to it is a visible change:
 - creating an automation (`POST /automations`) and triggering one (`POST /automations/:id/trigger`)
 - creating a session (`POST /sessions`), prompting one (`POST /sessions/:id/prompt`), and stopping
   one (`POST /sessions/:id/stop`), as the token's owner; identity enforcement maps the token to its
-  owner, so the session and the message are the owner's, and target checks read the narrowed set
+  owner, so the session and the message are the owner's, and target checks read the narrowed set.
+  Personal memory is authorized from the owner's live role inside the sandbox, beyond any grant, so
+  both routes first require `memories.manage_own` in the grant: creation without it excludes
+  personal memory (and refuses an explicit request for it), and a prompt into a session that
+  includes the owner's personal memory is refused (`isPersonalAccessTokenWithoutPersonalMemory`)
 - skill import and re-import, with their previews
 - reading one file of a session diff: `GET /sessions/:id/diff/:revisionId/files/:fileId`
 
