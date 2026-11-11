@@ -35,6 +35,10 @@ import type { Env } from "../types";
 import { resolveSessionProviderAuth } from "../session/provider-account-resolution";
 import { ProviderAccountSelectionPolicyError } from "../model-provider-accounts/selection-policy";
 import { authorizeEnvironmentTarget, authorizeSessionTarget } from "./session-target-authorization";
+import {
+  isPersonalAccessTokenWithoutPersonalMemory,
+  PERSONAL_MEMORY_PERMISSION_REQUIRED,
+} from "../authorization/personal-access-token-policy";
 import { resolveCreationOwnerTeam, teamRequiredResponse } from "./team-ownership";
 import {
   normalizeOptionalRepositoryPair,
@@ -122,6 +126,13 @@ export async function handleCreateSession(
       return error(e.message, 400);
     }
     throw e;
+  }
+
+  // A token without the personal-memory permission never starts work with its owner's personal
+  // memory: asked for explicitly, that is refused; left to the owner's default, it is off.
+  const tokenWithoutPersonalMemory = isPersonalAccessTokenWithoutPersonalMemory(ctx);
+  if (tokenWithoutPersonalMemory && body.includePersonalMemories === true) {
+    return json(PERSONAL_MEMORY_PERMISSION_REQUIRED, 403);
   }
 
   const targetAuthorizationError = await authorizeSessionTarget(ctx, {
@@ -318,7 +329,9 @@ export async function handleCreateSession(
     principal: { userId: resolvedUserId, ownerTeamId: teamId },
     repositories: scopeMembers,
     environmentId,
-    includePersonalMemories: personalMemoryInclusion(spawnSource, body),
+    includePersonalMemories: tokenWithoutPersonalMemory
+      ? false
+      : personalMemoryInclusion(spawnSource, body),
   });
 
   const input: SessionInitInput = {

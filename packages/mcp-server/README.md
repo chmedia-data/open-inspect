@@ -28,13 +28,13 @@ give it the shortest lifetime that works.
 
 ### Choose the grant for what you want the assistant to do
 
-| You want the assistant to…               | Grant                                                                                                |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Investigate sessions and automation runs | `sessions.read`, `automations.read`, `skills.read`                                                   |
-| Also run existing automations            | add `automations.trigger.own` (or `.any`), `sessions.create`, and the targets' use permission        |
-| Also create automations                  | add `automations.create`, `sessions.create`, and `repositories.use` and/or `environments.use`        |
-| Also import and update skills            | add `skills.manage` (the picker adds `skills.read` with it)                                          |
-| Also start, prompt, and stop sessions    | add `sessions.create`, `sessions.collaborate`, `sessions.lifecycle`, and the targets' use permission |
+| You want the assistant to…               | Grant                                                                                                                                           |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Investigate sessions and automation runs | `sessions.read`, `automations.read`, `skills.read`                                                                                              |
+| Also run existing automations            | add `automations.trigger.own` (or `.any`), `sessions.create`, and the targets' use permission                                                   |
+| Also create automations                  | add `automations.create`, `sessions.create`, and `repositories.use` and/or `environments.use`                                                   |
+| Also import and update skills            | add `skills.manage` (the picker adds `skills.read` with it)                                                                                     |
+| Also start, prompt, and stop sessions    | add `sessions.create`, `sessions.collaborate`, `sessions.lifecycle`, the targets' use permission, and `memories.manage_own` for personal memory |
 
 The **Read-only** button in the token picker selects the first row and every other read permission
 your role has and your workspace allows.
@@ -169,11 +169,20 @@ by target repository (`repo_owner`, `repo_name`, either alone).
 - `send_prompt` prompts a session you may collaborate on; it queues behind a running prompt.
 - `stop_session` stops the running prompt; the session stays and `send_prompt` continues it.
 
-A prompt sent with a token is authored by you, exactly as if you had typed it in the web app, and
-uses your connections. Open Inspect cannot tell whether you or an agent sent it; the audit log
+A prompt sent with a token is authored by you, exactly as if you had typed it in the web app: a pull
+request it opens uses your GitHub identity, and the session counts as interactive, so it uses the
+installation's default provider account rather than the unattended setting. It does not use your
+personal MCP connections. Open Inspect cannot tell whether you or an agent sent it; the audit log
 records the request with principal kind `personal-access-token`. Grant `sessions.collaborate` only
-to a client you would let type in your sessions. Follow progress with `get_session_messages` (a
-message's status turns `completed` or `failed`) and `get_session_events`.
+to a client you would let type in your sessions.
+
+Personal memory needs `memories.manage_own` in the grant. The agent reads and writes personal memory
+with your own role, which a token's grant cannot narrow, so without that permission `create_session`
+starts the session without your personal memory (asking for it is refused), and `send_prompt` is
+refused on a session that includes it.
+
+Follow progress with `get_session_messages` (a message's status turns `completed` or `failed`) and
+`get_session_events`.
 
 ### Skill writes
 

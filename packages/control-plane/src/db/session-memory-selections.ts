@@ -156,6 +156,15 @@ export class SessionMemorySelectionStore {
    * parent owner's personal records, measured like any manifest's: the records it keeps, rendered.
    * Null when the child keeps the parent's whole selection, and with it the parent's estimate.
    */
+  /** The user whose personal memory a session's pinned selection includes, or null. */
+  async personalOwner(sessionId: string): Promise<string | null> {
+    const header = await this.db
+      .prepare("SELECT personal_owner_user_id FROM session_memory_manifests WHERE session_id = ?")
+      .bind(sessionId)
+      .first<{ personal_owner_user_id: string | null }>();
+    return header?.personal_owner_user_id ?? null;
+  }
+
   async inheritedEstimatedTokens(
     parentId: string,
     promptAuthorUserId: string | null

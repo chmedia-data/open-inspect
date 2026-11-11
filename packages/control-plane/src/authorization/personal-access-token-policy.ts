@@ -144,3 +144,29 @@ export function restrictAuthorizationToGrant(
     ),
   };
 }
+
+/**
+ * Whether this request is a personal access token whose grant lacks `memories.manage_own`.
+ *
+ * Personal memory is authorized from the session owner's live role whenever the agent reads or
+ * writes it, inside the sandbox and long after the request that started the work, so a token's
+ * grant never reaches that check. A token may therefore start or prompt work with its owner's
+ * personal memory only if it holds the permission that gates personal memory; the session create
+ * and prompt routes ask this before they do.
+ */
+export function isPersonalAccessTokenWithoutPersonalMemory(ctx: {
+  principal?: { kind: string } | null;
+  authorization?: { permissions: readonly PermissionId[] } | null;
+}): boolean {
+  return (
+    ctx.principal?.kind === "personal-access-token" &&
+    !(ctx.authorization?.permissions.includes("memories.manage_own") ?? false)
+  );
+}
+
+/** The refusal both routes answer with, shaped like every other `permission_required`. */
+export const PERSONAL_MEMORY_PERMISSION_REQUIRED = {
+  error: "Forbidden",
+  code: "permission_required",
+  permission: "memories.manage_own",
+} as const;

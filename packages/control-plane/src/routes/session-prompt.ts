@@ -18,6 +18,11 @@ import {
 } from "../routing/identity-enforcement";
 import { resolveGitHubCredentialAuthority } from "../source-control/github-credential-authority";
 import { SessionIndexStore } from "../db/session-index";
+import { SessionMemorySelectionStore } from "../db/session-memory-selections";
+import {
+  isPersonalAccessTokenWithoutPersonalMemory,
+  PERSONAL_MEMORY_PERMISSION_REQUIRED,
+} from "../authorization/personal-access-token-policy";
 import { UserStore } from "../db/user-store";
 import { createLogger } from "../logger";
 import { SessionInternalPaths } from "../session/contracts";
@@ -89,6 +94,16 @@ export async function handleSessionPrompt(
       request_id: ctx.request_id,
       trace_id: ctx.trace_id,
     });
+  }
+
+  // A prompt runs with the session owner's personal memory when the session includes it, and that
+  // memory is authorized from the owner's live role, not the token's grant.
+  if (
+    canonicalUserId &&
+    isPersonalAccessTokenWithoutPersonalMemory(ctx) &&
+    (await new SessionMemorySelectionStore(ctx.db).personalOwner(sessionId)) === canonicalUserId
+  ) {
+    return json(PERSONAL_MEMORY_PERMISSION_REQUIRED, 403);
   }
 
   let enrichment: GitHubEnrichment | undefined;

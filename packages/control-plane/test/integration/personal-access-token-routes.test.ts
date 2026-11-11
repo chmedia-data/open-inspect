@@ -238,8 +238,78 @@ describe("driving sessions with a token", () => {
     );
     const lifecycle = await issueToken(OWNER, ["sessions.lifecycle"]);
     const stopped = await withToken(lifecycle, `/sessions/${sessionName}/stop`, { method: "POST" });
-    expect(stopped.status).not.toBe(403);
-    expect(stopped.status).not.toBe(401);
+    expect(stopped.status).toBe(200);
+  });
+
+  it("keeps its owner's personal memory out of a new session unless granted memories.manage_own", async () => {
+    await env.DB.prepare(
+      "INSERT INTO memory_preferences (user_id, include_personal_memories, updated_at) VALUES (?, 1, 1)"
+    )
+      .bind(OWNER)
+      .run();
+    const personalOwner = async (sessionId: string) =>
+      (
+        await env.DB.prepare(
+          "SELECT personal_owner_user_id FROM session_memory_manifests WHERE session_id = ?"
+        )
+          .bind(sessionId)
+          .first<{ personal_owner_user_id: string | null }>()
+      )?.personal_owner_user_id ?? null;
+
+    const withoutMemory = await issueToken(OWNER, ["sessions.create"]);
+    const created = await withToken(withoutMemory, "/sessions", {
+      method: "POST",
+      body: createBody,
+    });
+    expect(created.status).toBe(201);
+    expect(await personalOwner((await created.json<{ sessionId: string }>()).sessionId)).toBeNull();
+
+    const askedFor = await withToken(withoutMemory, "/sessions", {
+      method: "POST",
+      body: { ...createBody, includePersonalMemories: true },
+    });
+    expect(askedFor.status).toBe(403);
+    await expect(askedFor.json()).resolves.toMatchObject({
+      code: "permission_required",
+      permission: "memories.manage_own",
+    });
+
+    const withMemory = await issueToken(OWNER, ["sessions.create", "memories.manage_own"]);
+    const remembered = await withToken(withMemory, "/sessions", {
+      method: "POST",
+      body: createBody,
+    });
+    expect(remembered.status).toBe(201);
+    expect(await personalOwner((await remembered.json<{ sessionId: string }>()).sessionId)).toBe(
+      OWNER
+    );
+  });
+
+  it("refuses to prompt a session with its owner's personal memory unless granted memories.manage_own", async () => {
+    const { sessionName } = await initSession({ userId: OWNER });
+    await env.DB.prepare(
+      `INSERT INTO session_memory_manifests
+         (session_id, selection_version, manifest_sha256, personal_owner_user_id,
+          personal_auto_save_eligible, directive_chars, catalog_chars, estimated_tokens,
+          omitted_count, resolved_at)
+       VALUES (?, 1, 'sha', ?, 1, 0, 0, 0, 0, 1)`
+    )
+      .bind(sessionName, OWNER)
+      .run();
+    const prompt = { method: "POST", body: { content: "Run the tests" } } as const;
+
+    const withoutMemory = await issueToken(OWNER, ["sessions.collaborate"]);
+    const refused = await withToken(withoutMemory, `/sessions/${sessionName}/prompt`, prompt);
+    expect(refused.status).toBe(403);
+    await expect(refused.json()).resolves.toMatchObject({
+      code: "permission_required",
+      permission: "memories.manage_own",
+    });
+
+    const withMemory = await issueToken(OWNER, ["sessions.collaborate", "memories.manage_own"]);
+    expect((await withToken(withMemory, `/sessions/${sessionName}/prompt`, prompt)).status).toBe(
+      200
+    );
   });
 });
 
