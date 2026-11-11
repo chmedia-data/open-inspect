@@ -409,6 +409,146 @@ export const MODEL_CATALOG = [
       { id: "deepseek/deepseek-v4-pro", name: "DeepSeek V4 Pro", description: "Most capable" },
     ],
   },
+  // Amazon Bedrock through OpenCode's built-in amazon-bedrock provider, which
+  // reads AWS_REGION and AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key) from the
+  // sandbox environment. Every id here passed a tool-call run in OpenCode
+  // 1.19.5. No reasoning efforts: the OpenCode harness only forwards them for
+  // the anthropic, openai and xai providers.
+  {
+    // EU inference profiles and models served in the configured region, so
+    // requests stay in the EU when AWS_REGION is an EU region.
+    category: "Amazon Bedrock (EU)",
+    enabledByDefault: false,
+    models: [
+      {
+        id: "amazon-bedrock/eu.anthropic.claude-opus-5-5",
+        name: "Claude Opus 5.5",
+        description: "Bedrock EU",
+      },
+      {
+        id: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+        name: "Claude Sonnet 5.5",
+        description: "Bedrock EU",
+      },
+      {
+        id: "amazon-bedrock/eu.anthropic.claude-haiku-5-5",
+        name: "Claude Haiku 5.5",
+        description: "Bedrock EU",
+      },
+      {
+        id: "amazon-bedrock/eu.anthropic.claude-opus-5",
+        name: "Claude Opus 5",
+        description: "Bedrock EU",
+      },
+      {
+        id: "amazon-bedrock/eu.anthropic.claude-sonnet-5",
+        name: "Claude Sonnet 5",
+        description: "Bedrock EU",
+      },
+      {
+        id: "amazon-bedrock/openai.gpt-oss-120b-1:0",
+        name: "gpt-oss 120B",
+        description: "Bedrock, in region",
+      },
+      {
+        id: "amazon-bedrock/openai.gpt-oss-20b-1:0",
+        name: "gpt-oss 20B",
+        description: "Bedrock, in region",
+      },
+      {
+        id: "amazon-bedrock/qwen.qwen3-next-80b-a3b",
+        name: "Qwen3 Next 80B",
+        description: "Bedrock, in region",
+      },
+      {
+        id: "amazon-bedrock/qwen.qwen3-vl-235b-a22b",
+        name: "Qwen3 VL 235B",
+        description: "Bedrock, in region",
+      },
+      {
+        id: "amazon-bedrock/minimax.minimax-m2.5",
+        name: "MiniMax M2.5",
+        description: "Bedrock, in region",
+      },
+      {
+        id: "amazon-bedrock/nvidia.nemotron-super-3-120b",
+        name: "Nemotron 3 Super 120B",
+        description: "Bedrock, in region",
+      },
+      {
+        id: "amazon-bedrock/mistral.ministral-3-14b-instruct",
+        name: "Ministral 3 14B",
+        description: "Bedrock, in region",
+      },
+      {
+        id: "amazon-bedrock/eu.amazon.nova-pro-v1:0",
+        name: "Nova Pro",
+        description: "Bedrock EU",
+      },
+      {
+        id: "amazon-bedrock/eu.amazon.nova-2-lite-v1:0",
+        name: "Nova 2 Lite",
+        description: "Bedrock EU",
+      },
+    ],
+  },
+  {
+    // Global inference profiles: AWS may serve a request from any region.
+    category: "Amazon Bedrock (Global)",
+    enabledByDefault: false,
+    models: [
+      {
+        id: "amazon-bedrock/global.openai.gpt-6.1-sol",
+        name: "GPT-6.1 Sol",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.openai.gpt-6.1-terra",
+        name: "GPT-6.1 Terra",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.openai.gpt-6-sol",
+        name: "GPT-6 Sol",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.openai.gpt-6-astra",
+        name: "GPT-6 Astra",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.openai.gpt-6-luna",
+        name: "GPT-6 Luna",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.openai.gpt-5.6-sol",
+        name: "GPT-5.6 Sol",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.moonshotai.kimi-k3.1",
+        name: "Kimi K3.1",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.moonshotai.kimi-k3",
+        name: "Kimi K3",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.xai.grok-4.7",
+        name: "Grok 4.7",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.xai.grok-4.6",
+        name: "Grok 4.6",
+        description: "Bedrock global",
+      },
+    ],
+  },
 ] as const satisfies readonly ModelCatalogGroup[];
 
 export type ValidModel = (typeof MODEL_CATALOG)[number]["models"][number]["id"];

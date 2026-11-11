@@ -26,16 +26,18 @@ This page shows you where models are turned on, how to pick a model and reasonin
 
 Settings › Models lists every model in the catalog, grouped by provider, under the heading **Enabled Models**. Toggle a model on or off, or use **Enable all** and **Disable all** on a group. Changes save automatically and apply to the model selector across the web app and the Slack bot. You cannot disable the last enabled model.
 
-| Group            | Enabled by default |
-| ---------------- | ------------------ |
-| Anthropic        | Yes                |
-| OpenAI           | Yes                |
-| OpenCode Zen     | No                 |
-| OpenCode Go      | No                 |
-| xAI / SuperGrok  | No                 |
-| Kimi Coding Plan | No                 |
-| Z.AI Coding Plan | No                 |
-| DeepSeek         | No                 |
+| Group                   | Enabled by default |
+| ----------------------- | ------------------ |
+| Anthropic               | Yes                |
+| OpenAI                  | Yes                |
+| OpenCode Zen            | No                 |
+| OpenCode Go             | No                 |
+| xAI / SuperGrok         | No                 |
+| Kimi Coding Plan        | No                 |
+| Z.AI Coding Plan        | No                 |
+| DeepSeek                | No                 |
+| Amazon Bedrock (EU)     | No                 |
+| Amazon Bedrock (Global) | No                 |
 
 The deployment default model is Claude Sonnet 4.6 (`anthropic/claude-sonnet-4-6`). It is used when nothing else (a session, an integration setting, or an automation) picks a model.
 
@@ -210,6 +212,48 @@ Runs on OpenCode only. Opt-in group. Credential: `DEEPSEEK_API_KEY` as a global 
 | ---------------------------- | ----------------- | ----------------- | -------------- |
 | `deepseek/deepseek-v4-flash` | DeepSeek V4 Flash | Not supported     | N/A            |
 | `deepseek/deepseek-v4-pro`   | DeepSeek V4 Pro   | Not supported     | N/A            |
+
+### Amazon Bedrock (EU)
+
+Runs on OpenCode only. Opt-in group. Credentials: `AWS_BEARER_TOKEN_BEDROCK` (an Amazon Bedrock API key) and `AWS_REGION` as global or repository secrets.
+
+EU inference profiles and models served in the region set by `AWS_REGION`, so requests stay in the EU when that region is in the EU.
+
+| Model ID                                          | Display name          | Reasoning efforts | Default effort |
+| ------------------------------------------------- | --------------------- | ----------------- | -------------- |
+| `amazon-bedrock/eu.anthropic.claude-opus-5-5`     | Claude Opus 5.5       | Not supported     | N/A            |
+| `amazon-bedrock/eu.anthropic.claude-sonnet-5-5`   | Claude Sonnet 5.5     | Not supported     | N/A            |
+| `amazon-bedrock/eu.anthropic.claude-haiku-5-5`    | Claude Haiku 5.5      | Not supported     | N/A            |
+| `amazon-bedrock/eu.anthropic.claude-opus-5`       | Claude Opus 5         | Not supported     | N/A            |
+| `amazon-bedrock/eu.anthropic.claude-sonnet-5`     | Claude Sonnet 5       | Not supported     | N/A            |
+| `amazon-bedrock/openai.gpt-oss-120b-1:0`          | gpt-oss 120B          | Not supported     | N/A            |
+| `amazon-bedrock/openai.gpt-oss-20b-1:0`           | gpt-oss 20B           | Not supported     | N/A            |
+| `amazon-bedrock/qwen.qwen3-next-80b-a3b`          | Qwen3 Next 80B        | Not supported     | N/A            |
+| `amazon-bedrock/qwen.qwen3-vl-235b-a22b`          | Qwen3 VL 235B         | Not supported     | N/A            |
+| `amazon-bedrock/minimax.minimax-m2.5`             | MiniMax M2.5          | Not supported     | N/A            |
+| `amazon-bedrock/nvidia.nemotron-super-3-120b`     | Nemotron 3 Super 120B | Not supported     | N/A            |
+| `amazon-bedrock/mistral.ministral-3-14b-instruct` | Ministral 3 14B       | Not supported     | N/A            |
+| `amazon-bedrock/eu.amazon.nova-pro-v1:0`          | Nova Pro              | Not supported     | N/A            |
+| `amazon-bedrock/eu.amazon.nova-2-lite-v1:0`       | Nova 2 Lite           | Not supported     | N/A            |
+
+### Amazon Bedrock (Global)
+
+Runs on OpenCode only. Opt-in group. Credentials: `AWS_BEARER_TOKEN_BEDROCK` (an Amazon Bedrock API key) and `AWS_REGION` as global or repository secrets.
+
+Global inference profiles: AWS may serve a request from any region.
+
+| Model ID                                     | Display name  | Reasoning efforts | Default effort |
+| -------------------------------------------- | ------------- | ----------------- | -------------- |
+| `amazon-bedrock/global.openai.gpt-6.1-sol`   | GPT-6.1 Sol   | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-6.1-terra` | GPT-6.1 Terra | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-6-sol`     | GPT-6 Sol     | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-6-astra`   | GPT-6 Astra   | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-6-luna`    | GPT-6 Luna    | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-5.6-sol`   | GPT-5.6 Sol   | Not supported     | N/A            |
+| `amazon-bedrock/global.moonshotai.kimi-k3.1` | Kimi K3.1     | Not supported     | N/A            |
+| `amazon-bedrock/global.moonshotai.kimi-k3`   | Kimi K3       | Not supported     | N/A            |
+| `amazon-bedrock/global.xai.grok-4.7`         | Grok 4.7      | Not supported     | N/A            |
+| `amazon-bedrock/global.xai.grok-4.6`         | Grok 4.6      | Not supported     | N/A            |
 
 ## The same model behind several gateways
 

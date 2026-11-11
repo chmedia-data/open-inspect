@@ -2,10 +2,11 @@
 
 Open-Inspect exposes these models in the model picker and integration preferences. The default
 enabled set includes Anthropic and OpenAI models. xAI / SuperGrok, OpenCode Zen, OpenCode Go, Kimi
-Coding Plan, Z.AI Coding Plan, and DeepSeek models are available but must be enabled in **Settings >
-Models**. OpenAI and SuperGrok subscriptions are configured in **Settings > Provider Accounts**;
-OpenCode Zen and OpenCode Go require `OPENCODE_API_KEY`; Kimi Coding Plan requires `KIMI_API_KEY`;
-Z.AI Coding Plan requires `ZHIPU_API_KEY`; DeepSeek requires `DEEPSEEK_API_KEY`.
+Coding Plan, Z.AI Coding Plan, DeepSeek, and Amazon Bedrock models are available but must be enabled
+in **Settings > Models**. OpenAI and SuperGrok subscriptions are configured in **Settings > Provider
+Accounts**; OpenCode Zen and OpenCode Go require `OPENCODE_API_KEY`; Kimi Coding Plan requires
+`KIMI_API_KEY`; Z.AI Coding Plan requires `ZHIPU_API_KEY`; DeepSeek requires `DEEPSEEK_API_KEY`;
+Amazon Bedrock requires `AWS_BEARER_TOKEN_BEDROCK` and `AWS_REGION`.
 
 OpenAI, xAI and Anthropic session selectors offer provider policy, any active connected account, and
 API-key mode. Automation editors can resolve defaults on each run or pin an account/API-key choice.
@@ -191,3 +192,48 @@ DeepSeek models require `DEEPSEEK_API_KEY` as a global or repository secret.
 | ---------------------------- | ----------------- | ------------ | ----------------- | -------------- |
 | `deepseek/deepseek-v4-flash` | DeepSeek V4 Flash | Fast model   | Not supported     | N/A            |
 | `deepseek/deepseek-v4-pro`   | DeepSeek V4 Pro   | Most capable | Not supported     | N/A            |
+
+## Amazon Bedrock (EU)
+
+Runs on OpenCode only. Opt-in group. Credentials: `AWS_BEARER_TOKEN_BEDROCK` (an Amazon Bedrock API
+key) and `AWS_REGION` as global or repository secrets.
+
+EU inference profiles and models served in the region set by `AWS_REGION`, so requests stay in the
+EU when that region is in the EU.
+
+| Model ID                                          | Display name          | Description        | Reasoning efforts | Default effort |
+| ------------------------------------------------- | --------------------- | ------------------ | ----------------- | -------------- |
+| `amazon-bedrock/eu.anthropic.claude-opus-5-5`     | Claude Opus 5.5       | Bedrock EU         | Not supported     | N/A            |
+| `amazon-bedrock/eu.anthropic.claude-sonnet-5-5`   | Claude Sonnet 5.5     | Bedrock EU         | Not supported     | N/A            |
+| `amazon-bedrock/eu.anthropic.claude-haiku-5-5`    | Claude Haiku 5.5      | Bedrock EU         | Not supported     | N/A            |
+| `amazon-bedrock/eu.anthropic.claude-opus-5`       | Claude Opus 5         | Bedrock EU         | Not supported     | N/A            |
+| `amazon-bedrock/eu.anthropic.claude-sonnet-5`     | Claude Sonnet 5       | Bedrock EU         | Not supported     | N/A            |
+| `amazon-bedrock/openai.gpt-oss-120b-1:0`          | gpt-oss 120B          | Bedrock, in region | Not supported     | N/A            |
+| `amazon-bedrock/openai.gpt-oss-20b-1:0`           | gpt-oss 20B           | Bedrock, in region | Not supported     | N/A            |
+| `amazon-bedrock/qwen.qwen3-next-80b-a3b`          | Qwen3 Next 80B        | Bedrock, in region | Not supported     | N/A            |
+| `amazon-bedrock/qwen.qwen3-vl-235b-a22b`          | Qwen3 VL 235B         | Bedrock, in region | Not supported     | N/A            |
+| `amazon-bedrock/minimax.minimax-m2.5`             | MiniMax M2.5          | Bedrock, in region | Not supported     | N/A            |
+| `amazon-bedrock/nvidia.nemotron-super-3-120b`     | Nemotron 3 Super 120B | Bedrock, in region | Not supported     | N/A            |
+| `amazon-bedrock/mistral.ministral-3-14b-instruct` | Ministral 3 14B       | Bedrock, in region | Not supported     | N/A            |
+| `amazon-bedrock/eu.amazon.nova-pro-v1:0`          | Nova Pro              | Bedrock EU         | Not supported     | N/A            |
+| `amazon-bedrock/eu.amazon.nova-2-lite-v1:0`       | Nova 2 Lite           | Bedrock EU         | Not supported     | N/A            |
+
+## Amazon Bedrock (Global)
+
+Runs on OpenCode only. Opt-in group. Credentials: `AWS_BEARER_TOKEN_BEDROCK` (an Amazon Bedrock API
+key) and `AWS_REGION` as global or repository secrets.
+
+Global inference profiles: AWS may serve a request from any region.
+
+| Model ID                                     | Display name  | Description    | Reasoning efforts | Default effort |
+| -------------------------------------------- | ------------- | -------------- | ----------------- | -------------- |
+| `amazon-bedrock/global.openai.gpt-6.1-sol`   | GPT-6.1 Sol   | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-6.1-terra` | GPT-6.1 Terra | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-6-sol`     | GPT-6 Sol     | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-6-astra`   | GPT-6 Astra   | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-6-luna`    | GPT-6 Luna    | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-5.6-sol`   | GPT-5.6 Sol   | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.moonshotai.kimi-k3.1` | Kimi K3.1     | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.moonshotai.kimi-k3`   | Kimi K3       | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.xai.grok-4.7`         | Grok 4.7      | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.xai.grok-4.6`         | Grok 4.6      | Bedrock global | Not supported     | N/A            |
