@@ -311,6 +311,30 @@ describe("driving sessions with a token", () => {
       200
     );
   });
+
+  it("refuses to prompt another user's session that includes their personal memory", async () => {
+    // An account merge could later make that memory the token owner's while the prompt is queued.
+    const { sessionName } = await initSession({ userId: OTHER });
+    await env.DB.prepare(
+      `INSERT INTO session_memory_manifests
+         (session_id, selection_version, manifest_sha256, personal_owner_user_id,
+          personal_auto_save_eligible, directive_chars, catalog_chars, estimated_tokens,
+          omitted_count, resolved_at)
+       VALUES (?, 1, 'sha', ?, 1, 0, 0, 0, 0, 1)`
+    )
+      .bind(sessionName, OTHER)
+      .run();
+    const token = await issueToken(OWNER, ["sessions.collaborate"]);
+    const refused = await withToken(token, `/sessions/${sessionName}/prompt`, {
+      method: "POST",
+      body: { content: "Run the tests" },
+    });
+    expect(refused.status).toBe(403);
+    await expect(refused.json()).resolves.toMatchObject({
+      code: "permission_required",
+      permission: "memories.manage_own",
+    });
+  });
 });
 
 describe("automations with a token", () => {

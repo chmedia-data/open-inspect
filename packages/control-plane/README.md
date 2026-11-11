@@ -792,7 +792,7 @@ pins this list, so adding to it is a visible change:
   Personal memory is authorized from the owner's live role inside the sandbox, beyond any grant, so
   both routes first require `memories.manage_own` in the grant: creation without it excludes
   personal memory (and refuses an explicit request for it), and a prompt into a session that
-  includes the owner's personal memory is refused (`isPersonalAccessTokenWithoutPersonalMemory`)
+  includes anyone's personal memory is refused (`isPersonalAccessTokenWithoutPersonalMemory`)
 - skill import and re-import, with their previews
 - reading one file of a session diff: `GET /sessions/:id/diff/:revisionId/files/:fileId`
 

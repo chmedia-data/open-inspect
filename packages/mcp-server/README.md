@@ -179,7 +179,7 @@ to a client you would let type in your sessions.
 Personal memory needs `memories.manage_own` in the grant. The agent reads and writes personal memory
 with your own role, which a token's grant cannot narrow, so without that permission `create_session`
 starts the session without your personal memory (asking for it is refused), and `send_prompt` is
-refused on a session that includes it.
+refused on a session that includes anyone's personal memory.
 
 Follow progress with `get_session_messages` (a message's status turns `completed` or `failed`) and
 `get_session_events`.
