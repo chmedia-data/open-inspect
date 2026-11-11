@@ -97,11 +97,12 @@ export async function handleSessionPrompt(
   }
 
   // A prompt runs with the session owner's personal memory when the session includes it, and that
-  // memory is authorized from the owner's live role, not the token's grant.
+  // memory is authorized from the owner's live role, not the token's grant. Refused whoever the
+  // personal owner is: an account merge can later make another user's personal memory the token
+  // owner's while the prompt is still queued.
   if (
-    canonicalUserId &&
     isPersonalAccessTokenWithoutPersonalMemory(ctx) &&
-    (await new SessionMemorySelectionStore(ctx.db).personalOwner(sessionId)) === canonicalUserId
+    (await new SessionMemorySelectionStore(ctx.db).personalOwner(sessionId)) !== null
   ) {
     return json(PERSONAL_MEMORY_PERMISSION_REQUIRED, 403);
   }

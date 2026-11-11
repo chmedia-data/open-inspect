@@ -538,7 +538,7 @@ its owner does, and a suspended owner's tokens are refused.
   sessions as the token's owner; reading automations and skills; creating and triggering
   automations; and importing skills. A token prompt is authored by the owner, as one from the
   browser would be. A token without `memories.manage_own` starts sessions without the owner's
-  personal memory and cannot prompt a session that includes it.
+  personal memory and cannot prompt a session that includes anyone's personal memory.
 - Workspace management permissions (members, roles, secrets, integrations, and settings) are
   withheld from tokens, and the token routes accept only a browser session, so a token can never
   issue or revoke tokens. A token's `skills.manage` also needs `skills.read`.
