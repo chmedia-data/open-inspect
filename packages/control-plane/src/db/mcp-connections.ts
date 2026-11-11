@@ -12,6 +12,8 @@ export interface McpOAuthClient {
   redirect_uri: string;
   authorization_endpoint: string;
   token_endpoint: string;
+  /** Space-separated scope to request; '' for none, null on a client resolved before scopes. */
+  scope: string | null;
 }
 export interface McpConnectionRow {
   id: string;
@@ -141,10 +143,10 @@ export class McpConnectionStore {
   async saveClient(client: McpOAuthClient): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO mcp_oauth_clients (server_id, auth_revision, issuer, resource, client_id, redirect_uri, authorization_endpoint, token_endpoint)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM mcp_servers WHERE id = ? AND auth_revision = ? AND enabled = 1)
+        `INSERT INTO mcp_oauth_clients (server_id, auth_revision, issuer, resource, client_id, redirect_uri, authorization_endpoint, token_endpoint, scope)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM mcp_servers WHERE id = ? AND auth_revision = ? AND enabled = 1)
       ON CONFLICT(server_id) DO UPDATE SET auth_revision = excluded.auth_revision, issuer = excluded.issuer, resource = excluded.resource, client_id = excluded.client_id,
-      redirect_uri = excluded.redirect_uri, authorization_endpoint = excluded.authorization_endpoint, token_endpoint = excluded.token_endpoint`
+      redirect_uri = excluded.redirect_uri, authorization_endpoint = excluded.authorization_endpoint, token_endpoint = excluded.token_endpoint, scope = excluded.scope`
       )
       .bind(
         client.server_id,
@@ -155,6 +157,7 @@ export class McpConnectionStore {
         client.redirect_uri,
         client.authorization_endpoint,
         client.token_endpoint,
+        client.scope,
         client.server_id,
         client.auth_revision
       )

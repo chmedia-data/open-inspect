@@ -7,10 +7,16 @@ export type McpAuthMode = z.infer<typeof mcpAuthModeSchema>;
 export const DEFAULT_MCP_AUTH_MODE = "service_credentials" as const;
 export const MANAGED_MCP_VERSION = 1 as const;
 
-/** Initial profile: public HTTPS Streamable HTTP, public OAuth client with S256 PKCE. */
+/**
+ * Public HTTPS Streamable HTTP, public OAuth client with S256 PKCE. The client registers itself
+ * dynamically unless `clientId` names one the authorization server already knows, for servers
+ * without dynamic client registration (such as Snowflake, where an administrator creates the
+ * OAuth integration with Open Inspect's callback URL).
+ */
 export const mcpOAuthProfileSchema = z.strictObject({
   issuer: z.url(),
   resource: z.url(),
+  clientId: z.string().trim().min(1).max(512).optional(),
 });
 export type McpOAuthProfile = z.infer<typeof mcpOAuthProfileSchema>;
 

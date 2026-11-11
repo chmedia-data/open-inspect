@@ -489,6 +489,7 @@ export class McpServerStore {
       mergedType !== row.type ||
       oauth?.issuer !== oldAuth.oauth?.issuer ||
       oauth?.resource !== oldAuth.oauth?.resource ||
+      oauth?.clientId !== oldAuth.oauth?.clientId ||
       credentialsChanged ||
       JSON.stringify(repoScopes) !== JSON.stringify(oldRepoScopes) ||
       managedRouting !== oldAuth.managedRouting;
