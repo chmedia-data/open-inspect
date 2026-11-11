@@ -380,6 +380,9 @@ sessionCreateRoutes.post(
     ...GITHUB_USER_OR_SERVICE_ROUTE,
     authorization: requirePermission("sessions.create"),
     serviceActorClaims: extractSessionActorProfileClaims,
+    // A token creates the session as its owner (identity enforcement maps the token to its
+    // owner), and repository and environment checks read the token-narrowed permissions.
+    personalAccessTokens: "accept",
   }),
   (c) => dispatch(c, handleCreateSession)
 );

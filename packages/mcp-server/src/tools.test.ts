@@ -106,11 +106,14 @@ describe("tool surface", () => {
     const writes = tools.filter((entry) => entry.annotations?.readOnlyHint === false);
     expect(writes.map((entry) => entry.name).sort()).toEqual([
       "create_automation",
+      "create_session",
       "import_skill_from_git",
+      "send_prompt",
+      "stop_session",
       "trigger_automation",
       "update_skill_from_git",
     ]);
-    expect(tools).toHaveLength(13);
+    expect(tools).toHaveLength(16);
     // Re-import moves the skill's current revision, which is what later
     // sessions load; a client reads this to decide how hard to prompt.
     const hints = Object.fromEntries(
@@ -131,7 +134,7 @@ describe("tool surface", () => {
     await mcpClient.close();
   });
 
-  it("keeps the writes to these four, each behind a route that accepts tokens", () => {
+  it("keeps the writes to these seven, each behind a route that accepts tokens", () => {
     // A new write tool needs a control-plane route to accept personal access tokens first,
     // which is the review this list stands in for.
     const writes = TOOLS.filter((candidate) => !candidate.readOnly).map(
@@ -140,7 +143,10 @@ describe("tool surface", () => {
 
     expect(writes.sort()).toEqual([
       "create_automation",
+      "create_session",
       "import_skill_from_git",
+      "send_prompt",
+      "stop_session",
       "trigger_automation",
       "update_skill_from_git",
     ]);
@@ -499,6 +505,89 @@ describe("trigger_automation", () => {
     await tool("trigger_automation").run(client, { automation_id: "auto/../1" });
 
     expect(post).toHaveBeenCalledWith("/automations/auto%2F..%2F1/trigger", {});
+  });
+});
+
+describe("create_session", () => {
+  it("creates a repository session and returns its id", async () => {
+    const { client, post } = fakeClient({
+      post: () => ({ sessionId: "ses_1", status: "created" }),
+    });
+
+    const result = await tool("create_session").run(client, {
+      repo_owner: "acme",
+      repo_name: "web",
+      model: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+      harness: "opencode",
+    });
+
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post).toHaveBeenCalledWith("/sessions", {
+      repoOwner: "acme",
+      repoName: "web",
+      model: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+      harness: "opencode",
+    });
+    expect(result).toEqual({ sessionId: "ses_1", status: "created" });
+  });
+
+  it("sends the first prompt to the session it created", async () => {
+    const { client, post } = fakeClient({
+      post: (path) =>
+        path === "/sessions" ? { sessionId: "ses/1", status: "created" } : { messageId: "msg_1" },
+    });
+
+    const result = await tool("create_session").run(client, {
+      environment_id: "env_1",
+      prompt: "Run the tests",
+    });
+
+    expect(post).toHaveBeenNthCalledWith(1, "/sessions", { environmentId: "env_1" });
+    expect(post).toHaveBeenNthCalledWith(2, "/sessions/ses%2F1/prompt", {
+      content: "Run the tests",
+    });
+    expect(result).toEqual({
+      sessionId: "ses/1",
+      status: "created",
+      prompt: { messageId: "msg_1" },
+    });
+  });
+
+  it("refuses half a repository without calling the control plane", async () => {
+    const { client, post } = fakeClient({});
+
+    await expect(tool("create_session").run(client, { repo_owner: "acme" })).rejects.toThrow(
+      "repo_owner and repo_name must be given together"
+    );
+    expect(post).not.toHaveBeenCalled();
+  });
+});
+
+describe("send_prompt", () => {
+  it("posts the prompt to the escaped session route", async () => {
+    const { client, post } = fakeClient({ post: () => ({ messageId: "msg_1" }) });
+
+    const result = await tool("send_prompt").run(client, {
+      session_id: "ses/../1",
+      content: "Continue",
+      model: "openai/gpt-6.1-sol",
+    });
+
+    expect(post).toHaveBeenCalledWith("/sessions/ses%2F..%2F1/prompt", {
+      content: "Continue",
+      model: "openai/gpt-6.1-sol",
+    });
+    expect(result).toEqual({ messageId: "msg_1" });
+  });
+});
+
+describe("stop_session", () => {
+  it("posts to the escaped stop route", async () => {
+    const { client, post } = fakeClient({ post: () => ({ status: "stopping" }) });
+
+    await tool("stop_session").run(client, { session_id: "ses_1" });
+
+    expect(post).toHaveBeenCalledWith("/sessions/ses_1/stop", {});
   });
 });
 

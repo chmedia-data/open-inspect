@@ -5,13 +5,14 @@
  */
 
 import { env, SELF } from "cloudflare:test";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PermissionId } from "@open-inspect/shared/rbac";
 import { AutomationStore } from "../../src/db/automation-store";
 import { PersonalAccessTokenStore } from "../../src/db/personal-access-tokens";
 import { SessionIndexStore } from "../../src/db/session-index";
+import * as repositoryResolution from "../../src/repos/resolve";
 import { cleanD1Tables } from "./cleanup";
-import { initSession, seedActiveUser, seedEvents } from "./helpers";
+import { initSession, queryDO, seedActiveUser, seedEvents } from "./helpers";
 import { fetchRuns } from "./run-helpers";
 import { seedEnvironment } from "./ownership-test-helpers";
 
@@ -78,7 +79,10 @@ beforeEach(async () => {
     .bind(ADMIN)
     .run();
 });
-afterEach(cleanD1Tables);
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await cleanD1Tables();
+});
 
 describe("reading sessions with a token", () => {
   it("lists, reads events and messages, and needs sessions.read to do so", async () => {
@@ -118,7 +122,6 @@ describe("reading sessions with a token", () => {
     for (const [method, path] of [
       ["GET", `/sessions/${sessionName}/tunnel-urls`],
       ["GET", `/sessions/${sessionName}/sandbox-access`],
-      ["POST", "/sessions"],
       ["POST", `/sessions/${sessionName}/archive`],
     ] as const) {
       await expectRefusal(
@@ -127,6 +130,116 @@ describe("reading sessions with a token", () => {
         "personal_access_token_not_accepted"
       );
     }
+  });
+});
+
+describe("driving sessions with a token", () => {
+  const createBody = { title: "Token session", model: "anthropic/claude-haiku-4-5" };
+
+  it("creates a session as its owner with sessions.create, and is refused without it", async () => {
+    const creator = await issueToken(OWNER, ["sessions.create"]);
+    const created = await withToken(creator, "/sessions", { method: "POST", body: createBody });
+    expect(created.status).toBe(201);
+    const { sessionId } = await created.json<{ sessionId: string }>();
+    expect(await new SessionIndexStore(env.DB).get(sessionId)).toMatchObject({
+      userId: OWNER,
+      spawnSource: "user",
+    });
+
+    const audit = await env.DB.prepare(
+      `SELECT principal_kind, actor_user_id_snapshot FROM authorization_audit_events
+        WHERE action = 'authorization.request_allowed' AND resource_id = '/sessions'`
+    ).first<{ principal_kind: string; actor_user_id_snapshot: string }>();
+    expect(audit).toMatchObject({
+      principal_kind: "personal-access-token",
+      actor_user_id_snapshot: OWNER,
+    });
+
+    const reader = await issueToken(OWNER, ["sessions.read"]);
+    await expectRefusal(
+      await withToken(reader, "/sessions", { method: "POST", body: createBody }),
+      403,
+      "permission_required"
+    );
+  });
+
+  it("narrows the session target to the grant: the owner may use the environment, the token may not", async () => {
+    await seedEnvironment("env_token_session", null, [
+      { position: 0, repo_owner: "acme", repo_name: "web", repo_id: 1, base_branch: "main" },
+    ]);
+    // Repository resolution reaches GitHub; the grant check runs before it.
+    vi.spyOn(repositoryResolution, "resolveSessionRepositories").mockImplementation(
+      async (_env, repos) =>
+        repos.map((repo) => ({ ...repo, repoId: 1, baseBranch: repo.baseBranch ?? "main" }))
+    );
+    const body = { ...createBody, environmentId: "env_token_session" };
+    const withoutUse = await issueToken(OWNER, ["sessions.create"]);
+    const refused = await withToken(withoutUse, "/sessions", { method: "POST", body });
+    expect(refused.status).toBe(403);
+    await expect(refused.json()).resolves.toMatchObject({
+      code: "permission_required",
+      permission: "environments.use",
+    });
+
+    const withUse = await issueToken(OWNER, ["sessions.create", "environments.use"]);
+    expect((await withToken(withUse, "/sessions", { method: "POST", body })).status).toBe(201);
+  });
+
+  it("prompts as its owner with sessions.collaborate, and is refused without it", async () => {
+    const { stub, sessionName } = await initSession({ userId: OWNER });
+    const collaborator = await issueToken(OWNER, ["sessions.collaborate"]);
+    const prompted = await withToken(collaborator, `/sessions/${sessionName}/prompt`, {
+      method: "POST",
+      body: { content: "Run the tests" },
+    });
+    expect(prompted.status).toBe(200);
+    const { messageId } = await prompted.json<{ messageId: string }>();
+    expect(
+      await queryDO<{ user_id: string }>(
+        stub,
+        `SELECT p.user_id FROM messages m JOIN participants p ON p.id = m.author_id WHERE m.id = ?`,
+        messageId
+      )
+    ).toEqual([{ user_id: OWNER }]);
+
+    const reader = await issueToken(OWNER, ["sessions.read"]);
+    await expectRefusal(
+      await withToken(reader, `/sessions/${sessionName}/prompt`, {
+        method: "POST",
+        body: { content: "Run the tests" },
+      }),
+      403,
+      "permission_required"
+    );
+  });
+
+  it("does not prompt or stop a private session of another user", async () => {
+    const { sessionName } = await initSession({ userId: OTHER });
+    await env.DB.prepare("UPDATE sessions SET visibility = 'private' WHERE id = ?")
+      .bind(sessionName)
+      .run();
+    const token = await issueToken(OWNER, ["sessions.collaborate", "sessions.lifecycle"]);
+    const prompted = await withToken(token, `/sessions/${sessionName}/prompt`, {
+      method: "POST",
+      body: { content: "Run the tests" },
+    });
+    expect([403, 404]).toContain(prompted.status);
+    const stopped = await withToken(token, `/sessions/${sessionName}/stop`, { method: "POST" });
+    expect([403, 404]).toContain(stopped.status);
+  });
+
+  it("reaches stop only when granted sessions.lifecycle", async () => {
+    const { sessionName } = await initSession({ userId: OWNER });
+    const collaborator = await issueToken(OWNER, ["sessions.collaborate"]);
+    await expectRefusal(
+      await withToken(collaborator, `/sessions/${sessionName}/stop`, { method: "POST" }),
+      403,
+      "permission_required"
+    );
+    const lifecycle = await issueToken(OWNER, ["sessions.lifecycle"]);
+    const stopped = await withToken(lifecycle, `/sessions/${sessionName}/stop`, { method: "POST" });
+    expect(stopped.status).not.toBe(403);
+    expect(stopped.status).not.toBe(401);
   });
 });
 

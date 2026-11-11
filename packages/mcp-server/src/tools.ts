@@ -20,6 +20,11 @@ import {
   type CreateAutomationRequest,
 } from "@open-inspect/shared/types/automations";
 import type {
+  CreateSessionRequest,
+  CreateSessionResponse,
+  SendPromptRequest,
+} from "@open-inspect/shared/types/session-api";
+import type {
   importSkillInputSchema,
   reimportSkillInputSchema,
   reimportSkillPreviewInputSchema,
@@ -302,6 +307,117 @@ export const TOOLS: ToolDefinition[] = [
         `/sessions/${encodeURIComponent(args.session_id)}/diff` +
           `/${encodeURIComponent(args.revision_id)}/files/${encodeURIComponent(args.file_id)}`
       ),
+  }),
+  defineTool({
+    name: "create_session",
+    requires:
+      "sessions.create, plus repositories.use or environments.use for its target, and " +
+      "sessions.collaborate when a prompt is given",
+    title: "Start a session",
+    readOnly: false,
+    description:
+      "Start a new session as the token's owner, the same as starting one in the web app, and " +
+      "optionally send its first prompt. Target one repository (repo_owner and repo_name, " +
+      "optionally branch) or an environment (environment_id), not both. Returns the sessionId " +
+      "and, when a prompt was sent, its messageId. The agent works asynchronously: follow it " +
+      "with get_session_messages (the message status turns completed or failed) and " +
+      "get_session_events, continue it with send_prompt, and halt it with stop_session.",
+    inputSchema: {
+      repo_owner: repoOwner.optional(),
+      repo_name: repoName.optional(),
+      branch: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Branch the session starts from. Defaults to the repository's default branch."),
+      environment_id: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Environment (env_…) to launch from, instead of a single repository"),
+      title: z.string().min(1).optional().describe("Session title shown in the web app"),
+      harness: harnessIdSchema
+        .optional()
+        .describe("Agent harness. Defaults to the installation's built-in harness."),
+      model: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Model, such as openai/gpt-6.1-sol. Defaults to the installation's default."),
+      reasoning_effort: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Reasoning effort, where the selected model takes one"),
+      visibility: z
+        .enum(["private", "team", "workspace"])
+        .optional()
+        .describe("Who can see the session. Defaults to the workspace default."),
+      prompt: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("First prompt, sent right after the session is created"),
+    },
+    run: async (client, args) => {
+      if ((args.repo_owner === undefined) !== (args.repo_name === undefined)) {
+        throw new Error("repo_owner and repo_name must be given together");
+      }
+      const created = (await client.post("/sessions", {
+        repoOwner: args.repo_owner,
+        repoName: args.repo_name,
+        branch: args.branch,
+        environmentId: args.environment_id,
+        title: args.title,
+        harness: args.harness,
+        model: args.model,
+        reasoningEffort: args.reasoning_effort,
+        visibility: args.visibility,
+      } satisfies CreateSessionRequest)) as CreateSessionResponse;
+      if (args.prompt === undefined) return created;
+      const prompted = await client.post(
+        `/sessions/${encodeURIComponent(created.sessionId)}/prompt`,
+        { content: args.prompt } satisfies SendPromptRequest
+      );
+      return { ...created, prompt: prompted };
+    },
+  }),
+  defineTool({
+    name: "send_prompt",
+    requires: "sessions.collaborate",
+    title: "Prompt a session",
+    readOnly: false,
+    description:
+      "Send a prompt to an existing session as the token's owner, the same as typing it in the " +
+      "web app. It queues behind a prompt that is still running. Returns the messageId; follow " +
+      "the message's status with get_session_messages.",
+    inputSchema: {
+      session_id: sessionId,
+      content: z.string().min(1).describe("The prompt"),
+      model: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Model for this prompt. Defaults to the session's model."),
+      reasoning_effort: z.string().min(1).optional().describe("Reasoning effort for this prompt"),
+    },
+    run: (client, args) =>
+      client.post(`/sessions/${encodeURIComponent(args.session_id)}/prompt`, {
+        content: args.content,
+        model: args.model,
+        reasoningEffort: args.reasoning_effort,
+      } satisfies SendPromptRequest),
+  }),
+  defineTool({
+    name: "stop_session",
+    requires: "sessions.lifecycle",
+    title: "Stop a session",
+    readOnly: false,
+    description:
+      "Stop the prompt a session is running, as the stop button in the web app does. The " +
+      "session and its sandbox stay; send_prompt continues it.",
+    inputSchema: { session_id: sessionId },
+    run: (client, args) => client.post(`/sessions/${encodeURIComponent(args.session_id)}/stop`, {}),
   }),
   defineTool({
     name: "list_automations",

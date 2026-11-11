@@ -364,6 +364,8 @@ sessionRuntimeProxyRoutes.post(
     authorization: requireSession("lifecycle", {
       actorlessGrants: [{ service: "linear-bot" }],
     }),
+    // Lets a token stop the work it started; the grant must hold sessions.lifecycle.
+    personalAccessTokens: "accept",
   }),
   (c) =>
     dispatchSession(
