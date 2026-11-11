@@ -1,13 +1,11 @@
 /**
  * A personal-OAuth MCP server may name a pre-registered client, for authorization servers without
  * dynamic client registration. Against real D1: the client ID is stored with the OAuth profile,
- * changing it invalidates existing connections through the auth revision, and the resolved
- * client records the scope it requests.
+ * and changing it or the pinned scopes invalidates existing connections through the auth revision.
  */
 
 import { env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { McpConnectionStore } from "../../src/db/mcp-connections";
 import { McpServerStore } from "../../src/db/mcp-servers";
 import { cleanD1Tables } from "./cleanup";
 
@@ -58,24 +56,25 @@ describe("pre-registered MCP OAuth clients", () => {
     expect(removed?.authRevision).toBe(server.authRevision + 2);
   });
 
-  it("records the requested scope on the resolved client", async () => {
+  it("bumps the auth revision when the pinned scopes change", async () => {
     const server = await createServer("fixed-client");
-    const store = new McpConnectionStore(env.DB, env.TOKEN_ENCRYPTION_KEY!);
-    const client = {
-      server_id: server.id,
-      auth_revision: server.authRevision,
-      issuer: ORIGIN,
-      resource: `${ORIGIN}/mcp`,
-      client_id: "fixed-client",
-      redirect_uri: "https://app.test.local/api/mcp-connections/oauth/callback",
-      authorization_endpoint: `${ORIGIN}/authorize`,
-      token_endpoint: `${ORIGIN}/token`,
-      scope: "session:role:READER",
-    };
-    await store.saveClient(client);
-    expect(await store.getClient(server.id)).toMatchObject({ scope: "session:role:READER" });
-
-    await store.saveClient({ ...client, scope: "" });
-    expect(await store.getClient(server.id)).toMatchObject({ scope: "" });
+    const profile = (scopes?: string[]) => ({
+      oauth: {
+        issuer: ORIGIN,
+        resource: `${ORIGIN}/mcp`,
+        clientId: "fixed-client",
+        ...(scopes ? { scopes } : {}),
+      },
+    });
+    const pinned = await registry().update(server.id, profile(["session:role:READER"]));
+    expect(pinned?.authRevision).toBe(server.authRevision + 1);
+    expect(pinned?.oauth?.scopes).toEqual(["session:role:READER"]);
+    const same = await registry().update(server.id, profile(["session:role:READER"]));
+    expect(same?.authRevision).toBe(server.authRevision + 1);
+    const widened = await registry().update(
+      server.id,
+      profile(["session:role:READER", "refresh_token"])
+    );
+    expect(widened?.authRevision).toBe(server.authRevision + 2);
   });
 });

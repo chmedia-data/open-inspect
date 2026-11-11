@@ -424,7 +424,7 @@ describe("McpServersSettings", () => {
     }
   );
 
-  it("saves a pre-registered OAuth client ID with the OAuth profile", async () => {
+  it("saves a pre-registered OAuth client ID and scopes with the OAuth profile", async () => {
     mocks.updateMcpServer.mockResolvedValue({ ...servers[2], revision: 3 });
     const user = userEvent.setup();
     render(<McpServersSettings />);
@@ -440,6 +440,10 @@ describe("McpServersSettings", () => {
       screen.getByPlaceholderText("Leave blank to register automatically"),
       "  fixed-client  "
     );
+    await user.type(
+      screen.getByPlaceholderText("Space-separated; leave blank for the server's default"),
+      " session:role:READER   refresh_token "
+    );
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() =>
@@ -451,6 +455,7 @@ describe("McpServersSettings", () => {
             issuer: "https://issuer.example.com",
             resource: "https://c.example.com",
             clientId: "fixed-client",
+            scopes: ["session:role:READER", "refresh_token"],
           },
         })
       )

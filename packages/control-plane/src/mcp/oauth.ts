@@ -23,9 +23,7 @@ const metadataSchema = z.object({
   registration_endpoint: z.string().optional(),
   code_challenge_methods_supported: z.array(z.string()),
 });
-/** RFC 6749 §3.3 scope-token: printable ASCII without space, double quote or backslash. */
-const SCOPE_TOKEN = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
-const MAX_SCOPES = 32;
+
 const tokenSchema = z.object({
   access_token: z.string().min(1),
   refresh_token: z.string().min(1).optional(),
@@ -145,9 +143,7 @@ export class McpOAuthService {
     if (
       current &&
       current.auth_revision === server.authRevision &&
-      current.redirect_uri === redirectUri &&
-      // Resolved before scopes were requested: resolve again to learn them.
-      current.scope !== null
+      current.redirect_uri === redirectUri
     ) {
       this.assertProfile(current);
       mcpDestinationInRegistrableDomain(current.authorization_endpoint, issuer);
@@ -155,16 +151,8 @@ export class McpOAuthService {
     }
     const protectedMetadata = await protectedResourceMetadata(this.fetcher, resource);
     const protectedProfile = z
-      .object({
-        resource: z.string(),
-        authorization_servers: z.array(z.string()),
-        scopes_supported: z.array(z.string()).max(MAX_SCOPES).optional(),
-      })
+      .object({ resource: z.string(), authorization_servers: z.array(z.string()) })
       .parse(protectedMetadata);
-    // Request what the resource says it accepts (MCP authorization, RFC 9728). A server such as
-    // Snowflake rejects a request without its scope instead of falling back to a default.
-    const scopes = protectedProfile.scopes_supported ?? [];
-    if (!scopes.every((scope) => SCOPE_TOKEN.test(scope))) throw new McpError("mcp_unsupported");
     if (
       protectedProfile.resource !== server.oauth.resource ||
       !protectedProfile.authorization_servers.includes(server.oauth.issuer)
@@ -187,7 +175,12 @@ export class McpOAuthService {
     mcpDestination(metadata.token_endpoint, issuer.origin);
     const clientId =
       server.oauth.clientId ??
-      (await this.register(metadata.registration_endpoint, issuer, redirectUri));
+      (await this.register(
+        metadata.registration_endpoint,
+        issuer,
+        redirectUri,
+        server.oauth.scopes
+      ));
     const client = {
       server_id: server.id,
       auth_revision: server.authRevision!,
@@ -197,7 +190,6 @@ export class McpOAuthService {
       redirect_uri: redirectUri,
       authorization_endpoint: metadata.authorization_endpoint,
       token_endpoint: metadata.token_endpoint,
-      scope: scopes.join(" "),
     };
     await this.store.saveClient(client);
     return client;
@@ -209,7 +201,8 @@ export class McpOAuthService {
   private async register(
     registrationEndpoint: string | undefined,
     issuer: URL,
-    redirectUri: string
+    redirectUri: string,
+    scopes: readonly string[] | undefined
   ): Promise<string> {
     if (!registrationEndpoint) throw new McpError("mcp_unsupported");
     mcpDestination(registrationEndpoint, issuer.origin);
@@ -229,6 +222,9 @@ export class McpOAuthService {
             grant_types: ["authorization_code", "refresh_token"],
             response_types: ["code"],
             token_endpoint_auth_method: "none",
+            // Register for the scopes connections will request, so a server that limits a
+            // client to its registered scopes does not refuse them.
+            ...(scopes ? { scope: scopes.join(" ") } : {}),
           }),
         })
       );
@@ -268,7 +264,8 @@ export class McpOAuthService {
       state,
       code_challenge: challenge,
       code_challenge_method: "S256",
-      ...(client.scope ? { scope: client.scope } : {}),
+      // Exactly the scopes the administrator set; none means the server's default.
+      ...(server.oauth?.scopes ? { scope: server.oauth.scopes.join(" ") } : {}),
     }))
       url.searchParams.set(key, value);
     return url.toString();

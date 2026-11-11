@@ -7,16 +7,21 @@ export type McpAuthMode = z.infer<typeof mcpAuthModeSchema>;
 export const DEFAULT_MCP_AUTH_MODE = "service_credentials" as const;
 export const MANAGED_MCP_VERSION = 1 as const;
 
+/** RFC 6749 §3.3 scope-token: printable ASCII without space, double quote or backslash. */
+export const MCP_OAUTH_SCOPE_TOKEN = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
+
 /**
  * Public HTTPS Streamable HTTP, public OAuth client with S256 PKCE. The client registers itself
  * dynamically unless `clientId` names one the authorization server already knows, for servers
  * without dynamic client registration (such as Snowflake, where an administrator creates the
- * OAuth integration with Open Inspect's callback URL).
+ * OAuth integration with Open Inspect's callback URL). `scopes`, when set, is exactly what every
+ * connection requests; unset, no scope is sent and the authorization server applies its default.
  */
 export const mcpOAuthProfileSchema = z.strictObject({
   issuer: z.url(),
   resource: z.url(),
   clientId: z.string().trim().min(1).max(512).optional(),
+  scopes: z.array(z.string().regex(MCP_OAUTH_SCOPE_TOKEN)).min(1).max(32).optional(),
 });
 export type McpOAuthProfile = z.infer<typeof mcpOAuthProfileSchema>;
 
