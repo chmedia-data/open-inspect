@@ -40,13 +40,17 @@ def _freeze_json(value: Any) -> Any:
     return value
 
 
-def _validate_control_plane_url(url: str) -> None:
+def _validate_control_plane_url(url: str, *, allow_http: bool = False) -> None:
     if not url:
         return
     parsed = urlsplit(url)
     if parsed.scheme == "https" and parsed.hostname:
         return
-    if parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}:
+    if (
+        parsed.scheme == "http"
+        and parsed.hostname
+        and (allow_http or parsed.hostname in {"localhost", "127.0.0.1", "::1"})
+    ):
         return
     raise ValueError("CONTROL_PLANE_URL must use HTTPS except for loopback development URLs")
 
@@ -136,7 +140,10 @@ class RuntimeConfig:
         session_config = _freeze_json(parsed_session_config)
         repo_path = workspace_path / repo_name if repo_owner and repo_name else workspace_path
         control_plane_url = environment.get("CONTROL_PLANE_URL", "")
-        _validate_control_plane_url(control_plane_url)
+        _validate_control_plane_url(
+            control_plane_url,
+            allow_http=environment.get("OI_ALLOW_HTTP_CONTROL_PLANE") == "true",
+        )
         return cls(
             sandbox_id=environment.get("SANDBOX_ID", "unknown"),
             control_plane_url=control_plane_url,

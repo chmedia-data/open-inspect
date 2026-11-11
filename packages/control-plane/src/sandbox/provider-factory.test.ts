@@ -8,6 +8,34 @@ function createEnv(overrides: Partial<Env>): Env {
 }
 
 describe("createSandboxProviderFromEnv", () => {
+  it("requires the Node host capability for Docker, even with valid configuration", () => {
+    expect(() =>
+      createSandboxProviderFromEnv(
+        createEnv({
+          SANDBOX_PROVIDER: "docker",
+          DOCKER_SANDBOX_IMAGE: "local",
+          DOCKER_SANDBOX_NETWORK: "local",
+        })
+      )
+    ).toThrow("requires the Node control-plane host");
+  });
+
+  it("validates Docker configuration and resolves its provider", () => {
+    const env = createEnv({
+      SANDBOX_PROVIDER: "docker",
+      DOCKER_TRANSPORT: { request: async () => ({ status: 204, body: null }) },
+    });
+    expect(() => createSandboxProviderFromEnv(env)).toThrow(
+      "DOCKER_SANDBOX_IMAGE and DOCKER_SANDBOX_NETWORK"
+    );
+    env.DOCKER_SANDBOX_IMAGE = "sandbox:local";
+    env.DOCKER_SANDBOX_NETWORK = "sandboxes";
+    env.DOCKER_CONTROL_PLANE_URL = "http://app:8787";
+    expect(createSandboxProviderFromEnv(env).name).toBe("docker");
+    env.DOCKER_CONTROL_PLANE_URL = "http://app:8787/path";
+    expect(() => createSandboxProviderFromEnv(env)).toThrow("must be an HTTP(S) origin");
+  });
+
   it("rejects malformed Vercel numeric configuration", () => {
     const env = createEnv({
       VERCEL_TOKEN: "vercel-token",

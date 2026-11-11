@@ -44,6 +44,10 @@ import { SCHEDULED_JOBS } from "../scheduled-jobs";
 import { createSessionRuntime, type SessionRuntime } from "../session/components";
 import { createSessionRuntimeClient } from "../session/runtime-client";
 import type { Env, EnvConfig, Platform } from "../types";
+import { createDockerTransport } from "./docker-transport";
+import { createDockerPortalServer } from "./docker-portal-server";
+import { requireDockerSandboxNetwork, resolveDockerPortalConfig } from "../sandbox/docker-portals";
+import { resolveSandboxBackendName } from "../sandbox/provider-name";
 import { createNodeBackgroundTasks, settlesWithin } from "./background-tasks";
 import { openNodeCacheDatabase } from "./cache-database";
 import type { NodeHostSettings } from "./config";
@@ -187,7 +191,9 @@ async function boot(
     buildRuntime: (platform) => createSessionRuntime(platform, env),
     log,
   });
+  const dockerTransport = createDockerTransport(config.DOCKER_SOCKET_PATH);
   const platform: Platform = {
+    DOCKER_TRANSPORT: dockerTransport,
     DB: db,
     SESSION: createNodeSessionRuntimeDispatch(registry),
     REPOS_CACHE: new SqlCacheStore(cacheDb),
@@ -195,6 +201,23 @@ async function boot(
     JOBS: jobs,
   };
   const env: Env = { ...config, ...platform };
+  const portalConfig =
+    resolveSandboxBackendName(config.SANDBOX_PROVIDER) === "docker"
+      ? resolveDockerPortalConfig(config)
+      : undefined;
+  const portal = portalConfig
+    ? createDockerPortalServer({
+        transport: dockerTransport,
+        config: portalConfig,
+        deploymentName: config.DEPLOYMENT_NAME,
+        network: requireDockerSandboxNetwork(config.DOCKER_SANDBOX_NETWORK),
+      })
+    : undefined;
+  if (portal && portalConfig) {
+    acquire(() => portal.close());
+    portal.server.listen(portalConfig.port, settings.host);
+    await once(portal.server, "listening");
+  }
 
   const processTasks = createNodeBackgroundTasks(log);
   const host: ControlPlaneHost = { backgroundTasks: () => processTasks };
@@ -270,6 +293,8 @@ async function boot(
 
   const shutdown = async (): Promise<ShutdownReport> => {
     draining = true;
+    // Portal upgrades are independent of session sockets and must not hold shutdown open.
+    portal?.close();
     const deadlineMs = Date.now() + settings.shutdownTimeoutMs;
     const remaining = (): number => Math.max(0, deadlineMs - Date.now());
     log.info("node_host.draining", {

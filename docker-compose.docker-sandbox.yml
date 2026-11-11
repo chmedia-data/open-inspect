@@ -1,0 +1,27 @@
+# docker compose -f docker-compose.yml -f docker-compose.docker-sandbox.yml up --build
+services:
+  app:
+    environment:
+      SANDBOX_PROVIDER: docker
+      DOCKER_SOCKET_PATH: /var/run/docker.sock
+      DOCKER_SANDBOX_IMAGE: ${DOCKER_SANDBOX_IMAGE:-open-inspect-sandbox:local}
+      DOCKER_SANDBOX_NETWORK: ${DOCKER_SANDBOX_NETWORK:-open-inspect-sandboxes}
+      DOCKER_CONTROL_PLANE_URL: ${DOCKER_CONTROL_PLANE_URL:-http://app:8787}
+      DOCKER_PORTAL_PORT: ${DOCKER_PORTAL_PORT:-8790}
+      DOCKER_PORTAL_BASE_DOMAIN: ${DOCKER_PORTAL_BASE_DOMAIN:-localhost}
+      DOCKER_PORTAL_PUBLIC_PORT: ${DOCKER_PORTAL_PUBLIC_PORT:-8790}
+      DOCKER_PORTAL_SCHEME: ${DOCKER_PORTAL_SCHEME:-http}
+    ports:
+      - "127.0.0.1:${DOCKER_PORTAL_PUBLIC_PORT:-8790}:${DOCKER_PORTAL_PORT:-8790}"
+    volumes:
+      - ${DOCKER_HOST_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_SOCKET_GID:-991}"
+    networks:
+      - default
+      - sandboxes
+
+networks:
+  sandboxes:
+    name: ${DOCKER_SANDBOX_NETWORK:-open-inspect-sandboxes}
+    driver: bridge

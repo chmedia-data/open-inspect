@@ -10,6 +10,22 @@ const REQUIRED = {
 };
 
 describe("readEnvConfig", () => {
+  it("passes Docker settings through to the host without accepting a transport from env", () => {
+    const docker = {
+      SANDBOX_PROVIDER: "docker",
+      DOCKER_SOCKET_PATH: "/run/docker.sock",
+      DOCKER_SANDBOX_IMAGE: "sandbox:local",
+      DOCKER_SANDBOX_NETWORK: "sandboxes",
+      DOCKER_CONTROL_PLANE_URL: "http://app:8787",
+      DOCKER_PORTAL_PORT: "8791",
+      DOCKER_PORTAL_BASE_DOMAIN: "portals.example.com",
+      DOCKER_PORTAL_PUBLIC_PORT: "443",
+      DOCKER_PORTAL_SCHEME: "https",
+    };
+    expect(readEnvConfig({ ...REQUIRED, ...docker, DOCKER_TRANSPORT: "not-a-capability" })).toEqual(
+      { ...REQUIRED, ...docker }
+    );
+  });
   it("takes host-independent config and ignores Worker-only settings and other variables", () => {
     const config = readEnvConfig({
       ...REQUIRED,

@@ -316,6 +316,8 @@ export function buildSandboxEnvVars(
   delete envVars.NOVNC_PORT;
   delete envVars.TERMINAL_ENABLED;
   delete envVars.TTYD_PROXY_PORT;
+  // Only a host provider may allow plaintext callbacks on its private network.
+  delete envVars.OI_ALLOW_HTTP_CONTROL_PLANE;
   // Boot mode is the control plane's to decide. These are applied by the caller
   // after this returns (only when the corresponding mode is real), so unlike the
   // system keys below they are not overlaid and a repo secret of the same name

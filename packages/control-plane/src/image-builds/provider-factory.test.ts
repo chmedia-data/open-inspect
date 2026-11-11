@@ -2,12 +2,29 @@ import { describe, expect, it } from "vitest";
 import { createTestEnv } from "../router.test-support";
 import type { Env } from "../types";
 import { createImageBuildAdapterFactory } from "./provider-factory";
+import {
+  getImageBuildsUnsupportedMessage,
+  resolveImageBuildAdmission,
+  resolveImageBuildProvider,
+} from "./provider-policy";
 
 function createEnv(overrides: Partial<Env>): Env {
   return createTestEnv({ TOKEN_ENCRYPTION_KEY: "test-token-key", ...overrides });
 }
 
 describe("createImageBuildAdapterFactory", () => {
+  it("rejects Docker builds at admission without constructing an adapter", () => {
+    const env = createEnv({ SANDBOX_PROVIDER: "docker" });
+    expect(() => createImageBuildAdapterFactory(env)).not.toThrow();
+    expect(resolveImageBuildProvider("docker")).toBeNull();
+    expect(resolveImageBuildAdmission(env)).toEqual({
+      provider: null,
+      admitted: false,
+      reason: "provider_unsupported",
+    });
+    expect(getImageBuildsUnsupportedMessage(env)).toContain("Image builds are only available");
+  });
+
   it("needs a base snapshot to start a Daytona image build, but not to reclaim one", () => {
     const env = createEnv({
       DAYTONA_API_URL: "https://daytona.test",
