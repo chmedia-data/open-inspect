@@ -786,6 +786,9 @@ pins this list, so adding to it is a visible change:
 - reading automations: `GET /automations` and `/automations/:id{,/invocations,/runs/:runId}`
 - reading skills: `GET /skills` and `/skills/:id`
 - creating an automation (`POST /automations`) and triggering one (`POST /automations/:id/trigger`)
+- creating a session (`POST /sessions`), prompting one (`POST /sessions/:id/prompt`), and stopping
+  one (`POST /sessions/:id/stop`), as the token's owner; identity enforcement maps the token to its
+  owner, so the session and the message are the owner's, and target checks read the narrowed set
 - skill import and re-import, with their previews
 - reading one file of a session diff: `GET /sessions/:id/diff/:revisionId/files/:fileId`
 
@@ -801,8 +804,9 @@ Two rules reach past route admission:
   (`permission_prerequisite_missing`), and narrowing drops a `skills.manage` whose `skills.read` did
   not survive (`PERSONAL_ACCESS_TOKEN_GRANT_PREREQUISITES` in shared).
 
-Editing, pausing, or deleting automations, bulk skill import, and every session mutation, secret,
-and setting refuse tokens.
+Editing, pausing, or deleting automations, bulk skill import, archiving or deleting sessions,
+changing their collaborators or visibility, sandbox access, and every secret and setting refuse
+tokens.
 
 The owner's workspace role still decides visibility within a granted permission. For example, an
 administrator's token that holds `sessions.read` sees the sessions the administrator sees.

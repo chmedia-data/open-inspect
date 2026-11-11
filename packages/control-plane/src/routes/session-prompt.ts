@@ -159,6 +159,9 @@ sessionPromptRoutes.post(
   admit({
     ...GITHUB_USER_OR_SERVICE_ROUTE,
     authorization: requireSession("collaborate"),
+    // A token prompts as its owner, so the message is authored by the owner as if sent from
+    // the browser. The grant must hold sessions.collaborate.
+    personalAccessTokens: "accept",
   }),
   (c) => dispatchSession(c, handleSessionPrompt)
 );

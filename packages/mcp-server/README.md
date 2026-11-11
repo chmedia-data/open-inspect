@@ -28,12 +28,13 @@ give it the shortest lifetime that works.
 
 ### Choose the grant for what you want the assistant to do
 
-| You want the assistant to…               | Grant                                                                                         |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Investigate sessions and automation runs | `sessions.read`, `automations.read`, `skills.read`                                            |
-| Also run existing automations            | add `automations.trigger.own` (or `.any`), `sessions.create`, and the targets' use permission |
-| Also create automations                  | add `automations.create`, `sessions.create`, and `repositories.use` and/or `environments.use` |
-| Also import and update skills            | add `skills.manage` (the picker adds `skills.read` with it)                                   |
+| You want the assistant to…               | Grant                                                                                                |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Investigate sessions and automation runs | `sessions.read`, `automations.read`, `skills.read`                                                   |
+| Also run existing automations            | add `automations.trigger.own` (or `.any`), `sessions.create`, and the targets' use permission        |
+| Also create automations                  | add `automations.create`, `sessions.create`, and `repositories.use` and/or `environments.use`        |
+| Also import and update skills            | add `skills.manage` (the picker adds `skills.read` with it)                                          |
+| Also start, prompt, and stop sessions    | add `sessions.create`, `sessions.collaborate`, `sessions.lifecycle`, and the targets' use permission |
 
 The **Read-only** button in the token picker selects the first row and every other read permission
 your role has and your workspace allows.
@@ -121,13 +122,16 @@ Each tool's description states the grant it needs, so the assistant can tell you
 | `get_automation_run`          | `GET /automations/:id/runs/:runId`                 | `automations.read`                                     |
 | `create_automation`           | `POST /automations`                                | `automations.create`, `sessions.create`                |
 | `trigger_automation`          | `POST /automations/:id/trigger`                    | `automations.trigger.own` or `.any`, `sessions.create` |
+| `create_session`              | `POST /sessions` (+ `/sessions/:id/prompt`)        | `sessions.create` (+ `sessions.collaborate`)           |
+| `send_prompt`                 | `POST /sessions/:id/prompt`                        | `sessions.collaborate`                                 |
+| `stop_session`                | `POST /sessions/:id/stop`                          | `sessions.lifecycle`                                   |
 | `list_skills`                 | `GET /skills`                                      | `skills.read`                                          |
 | `import_skill_from_git`       | `POST /skills/import` (+ preview)                  | `skills.read`, `skills.manage`                         |
 | `update_skill_from_git`       | `POST /skills/:id/reimport` (+ …)                  | `skills.read`, `skills.manage`                         |
 
-`create_automation` and `trigger_automation` also need `repositories.use` or `environments.use` for
-the automation's targets, the same checks you face in the web UI. A triggered run uses only what the
-token was granted, even where your role allows more.
+`create_automation`, `trigger_automation`, and `create_session` also need `repositories.use` or
+`environments.use` for their targets, the same checks you face in the web UI. A triggered run uses
+only what the token was granted, even where your role allows more.
 
 `get_session_diff` lists a diff's changed files without their patches; `get_session_diff_file` reads
 one file's patch, using the revision and file ids from that list. `list_automation_invocations`
@@ -157,6 +161,19 @@ by target repository (`repo_owner`, `repo_name`, either alone).
   child runs; read one with `get_automation_run`. It fails with `409` while a run of that automation
   is already active. The invocation records its author as `unknown`, since a token does not
   establish whether a person or an agent fired it.
+
+### Session writes
+
+- `create_session` starts a session as you, on one repository or an environment, and with `prompt`
+  sends its first prompt in the same call.
+- `send_prompt` prompts a session you may collaborate on; it queues behind a running prompt.
+- `stop_session` stops the running prompt; the session stays and `send_prompt` continues it.
+
+A prompt sent with a token is authored by you, exactly as if you had typed it in the web app, and
+uses your connections. Open Inspect cannot tell whether you or an agent sent it; the audit log
+records the request with principal kind `personal-access-token`. Grant `sessions.collaborate` only
+to a client you would let type in your sessions. Follow progress with `get_session_messages` (a
+message's status turns `completed` or `failed`) and `get_session_events`.
 
 ### Skill writes
 

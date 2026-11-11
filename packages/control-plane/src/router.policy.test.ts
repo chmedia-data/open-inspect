@@ -905,6 +905,9 @@ describe("personal access token reach", () => {
         "GET /skills/:id",
         "POST /automations",
         "POST /automations/:id/trigger",
+        "POST /sessions",
+        "POST /sessions/:id/prompt",
+        "POST /sessions/:id/stop",
         "POST /skills/:id/reimport",
         "POST /skills/:id/reimport/preview",
         "POST /skills/import",
@@ -923,12 +926,16 @@ describe("personal access token reach", () => {
       ["DELETE", "/skills/skill-1"],
       ["PUT", "/skills/skill-1"],
       ["POST", "/skills/preview"],
-      ["POST", "/sessions"],
+      ["POST", "/sessions/session-1/archive"],
+      ["DELETE", "/sessions/session-1"],
+      ["DELETE", "/sessions/session-1/collaborators/user-1"],
       ["GET", "/sessions/session-1/tunnel-urls"],
       ["GET", "/sessions/session-1/sandbox-access"],
       ["GET", "/integration-settings/slack/watched-channels"],
     ] as const) {
-      expect(routeFor(method, path)?.personalAccessTokens, `${method} ${path}`).toBeUndefined();
+      const route = routeFor(method, path);
+      expect(route, `${method} ${path} exists`).toBeDefined();
+      expect(route?.personalAccessTokens, `${method} ${path}`).toBeUndefined();
     }
   });
 
