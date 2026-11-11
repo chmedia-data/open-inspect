@@ -85,3 +85,95 @@ describe("McpOAuthService protected resource discovery", () => {
     await expect(service.client(other, REDIRECT)).rejects.toMatchObject({ code: "mcp_denied" });
   });
 });
+
+describe("McpOAuthService scopes and pre-registered clients", () => {
+  function scoped(options: { published?: string[]; registration?: boolean } = {}) {
+    const requested: string[] = [];
+    const registrations: Record<string, unknown>[] = [];
+    const store = {
+      getClient: async () => null,
+      saveClient: async () => {},
+      begin: async () => {},
+    } as unknown as McpConnectionStore;
+    const fetcher = async (request: Request) => {
+      const url = new URL(request.url);
+      requested.push(url.pathname);
+      if (url.pathname.startsWith(ROOT_PATH)) {
+        return Response.json({
+          resource: RESOURCE,
+          authorization_servers: [ORIGIN],
+          ...(options.published ? { scopes_supported: options.published } : {}),
+        });
+      }
+      if (url.pathname === "/.well-known/oauth-authorization-server") {
+        return Response.json({
+          issuer: ORIGIN,
+          authorization_endpoint: `${ORIGIN}/authorize`,
+          token_endpoint: `${ORIGIN}/token`,
+          ...(options.registration === false
+            ? {}
+            : { registration_endpoint: `${ORIGIN}/register` }),
+          code_challenge_methods_supported: ["S256"],
+        });
+      }
+      if (url.pathname === "/register") {
+        registrations.push((await request.json()) as Record<string, unknown>);
+        return Response.json({
+          client_id: "registered",
+          token_endpoint_auth_method: "none",
+          redirect_uris: [REDIRECT],
+        });
+      }
+      return new Response("unexpected", { status: 500 });
+    };
+    return { service: new McpOAuthService(store, fetcher), requested, registrations };
+  }
+  const withOAuth = (oauth: Record<string, unknown>) =>
+    ({
+      ...server,
+      oauth: { issuer: ORIGIN, resource: RESOURCE, ...oauth },
+    }) as unknown as McpServerMetadata;
+  const snowflakeLike = withOAuth({
+    clientId: "fixed-client",
+    scopes: ["session:role:READER", "refresh_token"],
+  });
+
+  it("requests exactly the scopes the administrator set, and registers for them", async () => {
+    const { service, registrations } = scoped({ published: ["everything"] });
+    const url = new URL(
+      await service.start("owner", "browser", withOAuth({ scopes: ["read", "write"] }), REDIRECT)
+    );
+    expect(url.searchParams.get("scope")).toBe("read write");
+    expect(registrations[0]).toMatchObject({ scope: "read write" });
+  });
+
+  it("sends no scope without configured scopes, whatever the resource publishes", async () => {
+    const { service, registrations } = scoped({ published: ["session:role:ACCOUNTADMIN"] });
+    const url = new URL(await service.start("owner", "browser", server, REDIRECT));
+    expect(url.searchParams.has("scope")).toBe(false);
+    expect(registrations[0]).not.toHaveProperty("scope");
+  });
+
+  it("uses a pre-registered client without a registration endpoint and never registers", async () => {
+    const { service, requested } = scoped({ registration: false });
+    const url = new URL(await service.start("owner", "browser", snowflakeLike, REDIRECT));
+    expect(url.searchParams.get("client_id")).toBe("fixed-client");
+    expect(url.searchParams.get("scope")).toBe("session:role:READER refresh_token");
+    expect(requested).not.toContain("/register");
+  });
+
+  it("prefers the pre-registered client even where registration is offered", async () => {
+    const { service, requested } = scoped();
+    await expect(
+      service.client(withOAuth({ clientId: "fixed-client" }), REDIRECT)
+    ).resolves.toMatchObject({ client_id: "fixed-client" });
+    expect(requested).not.toContain("/register");
+  });
+
+  it("refuses a server with neither a registration endpoint nor a pre-registered client", async () => {
+    const { service } = scoped({ registration: false });
+    await expect(service.client(server, REDIRECT)).rejects.toMatchObject({
+      code: "mcp_unsupported",
+    });
+  });
+});

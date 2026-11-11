@@ -424,6 +424,44 @@ describe("McpServersSettings", () => {
     }
   );
 
+  it("saves a pre-registered OAuth client ID and scopes with the OAuth profile", async () => {
+    mocks.updateMcpServer.mockResolvedValue({ ...servers[2], revision: 3 });
+    const user = userEvent.setup();
+    render(<McpServersSettings />);
+
+    await user.click(screen.getByRole("button", { name: /Server C/ }));
+    await user.click(screen.getByRole("combobox", { name: "Authentication" }));
+    await user.click(screen.getByRole("option", { name: /Each user/ }));
+    await user.type(
+      screen.getByPlaceholderText("https://gateway.example.com/mcp"),
+      "https://issuer.example.com"
+    );
+    await user.type(
+      screen.getByPlaceholderText("Leave blank to register automatically"),
+      "  fixed-client  "
+    );
+    await user.type(
+      screen.getByPlaceholderText("Space-separated; leave blank for the server's default"),
+      " session:role:READER   refresh_token "
+    );
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() =>
+      expect(mocks.updateMcpServer).toHaveBeenCalledWith(
+        "server-c",
+        expect.objectContaining({
+          authMode: "user_oauth",
+          oauth: {
+            issuer: "https://issuer.example.com",
+            resource: "https://c.example.com",
+            clientId: "fixed-client",
+            scopes: ["session:role:READER", "refresh_token"],
+          },
+        })
+      )
+    );
+  });
+
   it("clears every saved header when all saved rows are removed", async () => {
     mocks.updateMcpServer.mockResolvedValue({ ...servers[2], revision: 3 });
     const user = userEvent.setup();

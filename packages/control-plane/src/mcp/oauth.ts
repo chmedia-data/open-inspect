@@ -19,9 +19,11 @@ const metadataSchema = z.object({
   issuer: z.string(),
   authorization_endpoint: z.string(),
   token_endpoint: z.string(),
-  registration_endpoint: z.string(),
+  // Optional: a server profile with a pre-registered clientId does not need it.
+  registration_endpoint: z.string().optional(),
   code_challenge_methods_supported: z.array(z.string()),
 });
+
 const tokenSchema = z.object({
   access_token: z.string().min(1),
   refresh_token: z.string().min(1).optional(),
@@ -170,8 +172,40 @@ export class McpOAuthService {
     // The browser-only authorization endpoint may live elsewhere on the issuer's registrable domain;
     // endpoints the control plane calls directly stay pinned to the issuer's exact origin.
     mcpDestinationInRegistrableDomain(metadata.authorization_endpoint, issuer);
-    for (const endpoint of [metadata.token_endpoint, metadata.registration_endpoint])
-      mcpDestination(endpoint, issuer.origin);
+    mcpDestination(metadata.token_endpoint, issuer.origin);
+    const clientId =
+      server.oauth.clientId ??
+      (await this.register(
+        metadata.registration_endpoint,
+        issuer,
+        redirectUri,
+        server.oauth.scopes
+      ));
+    const client = {
+      server_id: server.id,
+      auth_revision: server.authRevision!,
+      issuer: server.oauth.issuer,
+      resource: server.oauth.resource,
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      authorization_endpoint: metadata.authorization_endpoint,
+      token_endpoint: metadata.token_endpoint,
+    };
+    await this.store.saveClient(client);
+    return client;
+  }
+  /**
+   * RFC 7591 registration of a public client for exactly this redirect URI. A server without a
+   * registration endpoint is unsupported unless its profile names a pre-registered client.
+   */
+  private async register(
+    registrationEndpoint: string | undefined,
+    issuer: URL,
+    redirectUri: string,
+    scopes: readonly string[] | undefined
+  ): Promise<string> {
+    if (!registrationEndpoint) throw new McpError("mcp_unsupported");
+    mcpDestination(registrationEndpoint, issuer.origin);
     const registration = z
       .object({
         client_id: z.string().min(1),
@@ -179,7 +213,7 @@ export class McpOAuthService {
         redirect_uris: z.array(z.string()),
       })
       .parse(
-        await oauthRequest(this.fetcher, metadata.registration_endpoint, {
+        await oauthRequest(this.fetcher, registrationEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -188,23 +222,15 @@ export class McpOAuthService {
             grant_types: ["authorization_code", "refresh_token"],
             response_types: ["code"],
             token_endpoint_auth_method: "none",
+            // Register for the scopes connections will request, so a server that limits a
+            // client to its registered scopes does not refuse them.
+            ...(scopes ? { scope: scopes.join(" ") } : {}),
           }),
         })
       );
     if (registration.redirect_uris.length !== 1 || registration.redirect_uris[0] !== redirectUri)
       throw new McpError("mcp_denied");
-    const client = {
-      server_id: server.id,
-      auth_revision: server.authRevision!,
-      issuer: server.oauth.issuer,
-      resource: server.oauth.resource,
-      client_id: registration.client_id,
-      redirect_uri: redirectUri,
-      authorization_endpoint: metadata.authorization_endpoint,
-      token_endpoint: metadata.token_endpoint,
-    };
-    await this.store.saveClient(client);
-    return client;
+    return registration.client_id;
   }
   async start(
     ownerId: string,
@@ -238,6 +264,8 @@ export class McpOAuthService {
       state,
       code_challenge: challenge,
       code_challenge_method: "S256",
+      // Exactly the scopes the administrator set; none means the server's default.
+      ...(server.oauth?.scopes ? { scope: server.oauth.scopes.join(" ") } : {}),
     }))
       url.searchParams.set(key, value);
     return url.toString();

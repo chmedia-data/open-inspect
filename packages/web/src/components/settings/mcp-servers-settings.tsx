@@ -84,6 +84,8 @@ type FormState = {
   managedRouting: boolean;
   issuer: string;
   resource: string;
+  clientId: string;
+  scopes: string;
   type: "local" | "remote";
   command: string;
   url: string;
@@ -99,6 +101,8 @@ const emptyForm: FormState = {
   managedRouting: false,
   issuer: "",
   resource: "",
+  clientId: "",
+  scopes: "",
   type: "local",
   command: "",
   url: "",
@@ -152,6 +156,8 @@ function metadataToForm(metadata: McpServerMetadata): FormState {
     managedRouting: metadata.managedRouting ?? false,
     issuer: metadata.oauth?.issuer ?? "",
     resource: metadata.oauth?.resource ?? "",
+    clientId: metadata.oauth?.clientId ?? "",
+    scopes: metadata.oauth?.scopes?.join(" ") ?? "",
     type: metadata.type,
     command:
       metadata.command
@@ -492,9 +498,24 @@ function McpServerForm({
                 onChange={(e) => setForm({ ...form, resource: e.target.value })}
                 placeholder={form.url || "https://gateway.example.com/mcp"}
               />
+              <Label>OAuth client ID</Label>
+              <Input
+                value={form.clientId}
+                onChange={(e) => setForm({ ...form, clientId: e.target.value })}
+                placeholder="Leave blank to register automatically"
+              />
+              <Label>OAuth scopes</Label>
+              <Input
+                value={form.scopes}
+                onChange={(e) => setForm({ ...form, scopes: e.target.value })}
+                placeholder="Space-separated; leave blank for the server's default"
+              />
               <p className="text-xs text-muted-foreground">
                 Users connect their accounts in Personal → Connections. Supported servers use
-                public-client OAuth with PKCE and Streamable HTTP.
+                public-client OAuth with PKCE and Streamable HTTP. Enter a client ID only for a
+                server without dynamic client registration; register that public client with this
+                deployment&apos;s callback URL, /api/mcp-connections/oauth/callback on the web app.
+                Scopes, when set, are exactly what every connection requests.
               </p>
             </>
           )}
@@ -683,6 +704,8 @@ export function McpServersSettings() {
                   ? {
                       issuer: form.issuer.trim(),
                       resource: form.resource.trim() || form.url.trim(),
+                      ...(form.clientId.trim() ? { clientId: form.clientId.trim() } : {}),
+                      ...(form.scopes.trim() ? { scopes: form.scopes.trim().split(/\s+/) } : {}),
                     }
                   : null,
               ...(includeCredentials ? { headers: envRecord } : {}),
