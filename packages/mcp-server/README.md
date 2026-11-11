@@ -171,10 +171,13 @@ by target repository (`repo_owner`, `repo_name`, either alone).
 
 A prompt sent with a token is authored by you, exactly as if you had typed it in the web app: a pull
 request it opens uses your GitHub identity, and the session counts as interactive, so it uses the
-installation's default provider account rather than the unattended setting. It does not use your
-personal MCP connections. Open Inspect cannot tell whether you or an agent sent it; the audit log
-records the request with principal kind `personal-access-token`. Grant `sessions.collaborate` only
-to a client you would let type in your sessions.
+installation's default provider account rather than the unattended setting. It uses your personal
+MCP connections only when the token holds `mcp_connections.use`. The permission is checked when the
+prompt is accepted. Revoking the token, or removing `mcp_connections.use` from it, does not stop
+work already queued or running with it, including its retries and the child sessions it spawns: stop
+those sessions to end their calls. Open Inspect cannot tell whether you or an agent sent it; the
+audit log records the request with principal kind `personal-access-token`. Grant
+`sessions.collaborate` only to a client you would let type in your sessions.
 
 Personal memory needs `memories.manage_own` in the grant. The agent reads and writes personal memory
 with your own role, which a token's grant cannot narrow, so without that permission `create_session`

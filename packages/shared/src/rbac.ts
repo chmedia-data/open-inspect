@@ -59,6 +59,7 @@ export const PERMISSION_IDS = [
   "image_builds.read",
   "integrations.manage",
   "integrations.read",
+  "mcp_connections.use",
   "mcp_servers.manage",
   "mcp_servers.read",
   "memories.manage_own",
@@ -161,6 +162,7 @@ const MEMBER_PERMISSIONS = new Set<PermissionId>([
   "sessions.sandbox_access",
   "skill_profiles.manage_own",
   "memories.manage_own",
+  "mcp_connections.use",
 ]);
 
 /** Validates permission identifiers at API and storage boundaries. */

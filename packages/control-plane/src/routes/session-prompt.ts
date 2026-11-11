@@ -126,7 +126,11 @@ export async function handleSessionPrompt(
       (ctx.principal?.kind === "user" ||
         (ctx.principal?.kind === "service" &&
           ctx.principal.service === "slack-bot" &&
-          !!ctx.principal.actor)),
+          !!ctx.principal.actor) ||
+        // A token uses its owner's personal connections only when its grant says so: the
+        // connection's reach at the external service is beyond what any grant can narrow.
+        (ctx.principal?.kind === "personal-access-token" &&
+          (ctx.authorization?.permissions.includes("mcp_connections.use") ?? false))),
     source: body.source || "web",
     model: body.model,
     reasoningEffort: body.reasoningEffort,

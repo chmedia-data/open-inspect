@@ -312,6 +312,29 @@ describe("driving sessions with a token", () => {
     );
   });
 
+  it("lets a token prompt use its owner's personal MCP connections only when granted mcp_connections.use", async () => {
+    const { stub, sessionName } = await initSession({ userId: OWNER });
+    const eligible = async (token: string) => {
+      const response = await withToken(token, `/sessions/${sessionName}/prompt`, {
+        method: "POST",
+        body: { content: "Query the warehouse" },
+      });
+      expect(response.status).toBe(200);
+      const { messageId } = await response.json<{ messageId: string }>();
+      const [row] = await queryDO<{ mcp_eligible: number }>(
+        stub,
+        "SELECT mcp_eligible FROM messages WHERE id = ?",
+        messageId
+      );
+      return row?.mcp_eligible;
+    };
+
+    expect(await eligible(await issueToken(OWNER, ["sessions.collaborate"]))).toBe(0);
+    expect(
+      await eligible(await issueToken(OWNER, ["sessions.collaborate", "mcp_connections.use"]))
+    ).toBe(1);
+  });
+
   it("refuses to prompt another user's session that includes their personal memory", async () => {
     // An account merge could later make that memory the token owner's while the prompt is queued.
     const { sessionName } = await initSession({ userId: OTHER });
