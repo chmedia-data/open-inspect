@@ -117,6 +117,13 @@ export const PERSONAL_ACCESS_TOKEN_PERMISSION_COPY = {
     description: "Create and edit your own skill profiles",
     readOnly: false,
   },
+  "mcp_connections.use": {
+    group: "sessions",
+    label: "Use your MCP connections",
+    description:
+      "Prompts sent with this token use your personal MCP connections, your own logins at services such as Snowflake or Linear",
+    readOnly: false,
+  },
   "memories.manage_own": {
     group: "skills",
     label: "Manage your memories",

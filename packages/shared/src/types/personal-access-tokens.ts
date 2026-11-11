@@ -70,6 +70,7 @@ export const PERSONAL_ACCESS_TOKEN_GRANTABILITY = {
   "integrations.read": "grantable",
   "mcp_servers.manage": "withheld",
   "mcp_servers.read": "grantable",
+  "mcp_connections.use": "grantable",
   "memories.manage_own": "grantable",
   "models.preferences.manage": "withheld",
   "provider_accounts.manage": "withheld",
