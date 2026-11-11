@@ -1,6 +1,6 @@
 # Reference build. The context is the output of sandbox:images pack, not the checkout.
 ARG BASE_IMAGE=python:3.12-slim-bookworm
-FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE} AS base
 COPY image-config.sh /tmp/openinspect-image/image-config.sh
 COPY packages/sandbox-images/install/install.sh packages/sandbox-images/install/common.sh /tmp/openinspect-image/packages/sandbox-images/install/
 COPY packages/sandbox-images/install/os /tmp/openinspect-image/packages/sandbox-images/install/os
@@ -15,3 +15,11 @@ COPY . /tmp/openinspect-image
 RUN bash /tmp/openinspect-image/packages/sandbox-images/install/install.sh runtime filesystem && /opt/openinspect/python/bin/python /tmp/openinspect-image/packages/sandbox-images/verify/smoke_test.py install
 WORKDIR /workspace
 CMD ["/opt/openinspect/python/bin/python", "/app/verify/smoke_test.py", "verify"]
+
+FROM base AS docker
+COPY packages/sandbox-images/docker/launcher.sh /app/docker-launcher.sh
+ENTRYPOINT ["/bin/bash", "/app/docker-launcher.sh"]
+CMD []
+
+# Preserve the reference build's default verification command.
+FROM base AS verification

@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "sandbox:images": "python3 packages/sandbox-images/cli.py",
+    "sandbox:docker:build": "UV_NO_CONFIG=true uv run --project packages/sandbox-images --frozen python packages/sandbox-images/cli.py build --provider docker",
     "sandbox:cleanup-base-snapshots": "npm run --silent build:base-snapshot-cleanup && node dist/cleanup-base-snapshots.mjs",
     "lint": "eslint .",
     "lint:complexity": "node scripts/lint-complexity.mjs",

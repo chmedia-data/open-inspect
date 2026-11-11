@@ -23,6 +23,46 @@ import { createVercelSandboxClient } from "./providers/vercel/client";
 import { createVercelProvider, type VercelSandboxProvider } from "./providers/vercel/provider";
 import { resolveScmProviderFromEnv } from "../source-control";
 import type { Env } from "../types";
+import { DockerSandboxProvider } from "./providers/docker-provider";
+import { requireDockerSandboxNetwork, resolveDockerPortalConfig } from "./docker-portals";
+
+function createDockerProviderFromEnv(env: Env): DockerSandboxProvider {
+  if (!env.DOCKER_TRANSPORT) {
+    throw new Error(
+      "SANDBOX_PROVIDER=docker requires the Node control-plane host; Cloudflare Workers cannot access the Docker socket"
+    );
+  }
+  if (!env.DOCKER_SANDBOX_IMAGE?.trim() || !env.DOCKER_SANDBOX_NETWORK?.trim()) {
+    throw new Error(
+      "DOCKER_SANDBOX_IMAGE and DOCKER_SANDBOX_NETWORK are required when SANDBOX_PROVIDER=docker"
+    );
+  }
+  const controlPlaneUrl = env.DOCKER_CONTROL_PLANE_URL?.trim() || undefined;
+  if (controlPlaneUrl) {
+    const url = new URL(controlPlaneUrl);
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== "/"
+    ) {
+      throw new Error(
+        "DOCKER_CONTROL_PLANE_URL must be an HTTP(S) origin without credentials, path, query or fragment"
+      );
+    }
+  }
+  return new DockerSandboxProvider(env.DOCKER_TRANSPORT, {
+    image: env.DOCKER_SANDBOX_IMAGE.trim(),
+    network: requireDockerSandboxNetwork(env.DOCKER_SANDBOX_NETWORK),
+    controlPlaneUrl,
+    deploymentName: env.DEPLOYMENT_NAME,
+    scmProvider: resolveScmProviderFromEnv(env.SCM_PROVIDER),
+    portal: resolveDockerPortalConfig(env),
+    sandboxAccessPasswordSecret: env.TOKEN_ENCRYPTION_KEY,
+  });
+}
 
 function createModalProviderFromEnv(env: Env, backend: "modal" | "modal-vm"): ModalSandboxProvider {
   if (!env.MODAL_API_SECRET || !env.MODAL_WORKSPACE) {
@@ -184,6 +224,7 @@ function createBoatProviderFromEnv(env: Env): BoatSandboxProvider {
 }
 
 export function createSandboxProviderFromEnv(env: Env, backend: "boat"): BoatSandboxProvider;
+export function createSandboxProviderFromEnv(env: Env, backend: "docker"): DockerSandboxProvider;
 export function createSandboxProviderFromEnv(env: Env, backend: "daytona"): DaytonaSandboxProvider;
 export function createSandboxProviderFromEnv(env: Env, backend: "e2b"): E2BSandboxProvider;
 export function createSandboxProviderFromEnv(
@@ -200,6 +241,8 @@ export function createSandboxProviderFromEnv(
   backend: SandboxBackendName = resolveSandboxBackendName(env.SANDBOX_PROVIDER)
 ): SandboxProvider {
   switch (backend) {
+    case "docker":
+      return createDockerProviderFromEnv(env);
     case "boat":
       return createBoatProviderFromEnv(env);
     case "daytona":

@@ -63,6 +63,28 @@ def test_runtime_config_allows_loopback_http_control_plane_url(url):
     assert RuntimeConfig.from_env({"CONTROL_PLANE_URL": url}).control_plane_url == url
 
 
+def test_runtime_config_allows_explicit_private_network_http():
+    config = RuntimeConfig.from_env(
+        {"CONTROL_PLANE_URL": "http://app:8787", "OI_ALLOW_HTTP_CONTROL_PLANE": "true"}
+    )
+    assert config.control_plane_url == "http://app:8787"
+
+
+@pytest.mark.parametrize("flag", ["", "false", "1", "TRUE"])
+def test_runtime_config_http_opt_in_requires_exact_value(flag):
+    with pytest.raises(ValueError, match="must use HTTPS"):
+        RuntimeConfig.from_env(
+            {"CONTROL_PLANE_URL": "http://app:8787", "OI_ALLOW_HTTP_CONTROL_PLANE": flag}
+        )
+
+
+def test_runtime_config_http_opt_in_does_not_allow_other_schemes():
+    with pytest.raises(ValueError, match="must use HTTPS"):
+        RuntimeConfig.from_env(
+            {"CONTROL_PLANE_URL": "ftp://app", "OI_ALLOW_HTTP_CONTROL_PLANE": "true"}
+        )
+
+
 def test_session_config_is_recursively_immutable():
     config = RuntimeConfig.from_env(
         {

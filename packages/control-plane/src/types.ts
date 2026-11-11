@@ -8,6 +8,7 @@ import type { Jobs } from "./jobs";
 import type { FetchClient, QueueMetricsSource } from "./platform-ports";
 import type { SessionRuntimeDispatch } from "./session/runtime-client";
 import type { ObjectStorage } from "./storage/object-storage";
+import type { DockerTransport } from "./sandbox/docker-transport";
 
 /**
  * The deployment's configuration: variables and secrets, every one a string,
@@ -60,7 +61,15 @@ export interface EnvConfig {
   ALLOWED_GITHUB_ORGS?: string;
   UNSAFE_ALLOW_ALL_USERS?: string;
   CF_ACCOUNT_ID?: string; // Cloudflare account ID
-  SANDBOX_PROVIDER?: string; // "modal" (default), "modal-vm", "daytona", "vercel", "e2b", or "boat"
+  SANDBOX_PROVIDER?: string; // "modal" (default), "modal-vm", "daytona", "vercel", "e2b", "boat", or "docker"
+  DOCKER_SOCKET_PATH?: string;
+  DOCKER_SANDBOX_IMAGE?: string;
+  DOCKER_SANDBOX_NETWORK?: string;
+  DOCKER_CONTROL_PLANE_URL?: string;
+  DOCKER_PORTAL_PORT?: string;
+  DOCKER_PORTAL_BASE_DOMAIN?: string;
+  DOCKER_PORTAL_PUBLIC_PORT?: string;
+  DOCKER_PORTAL_SCHEME?: string;
   MODAL_WORKSPACE?: string; // Modal workspace name
   MODAL_ENVIRONMENT?: string; // Modal environment name for dashboard URLs
   MODAL_ENVIRONMENT_WEB_SUFFIX?: string; // Modal environment web suffix for endpoint URLs
@@ -114,6 +123,8 @@ export interface EnvConfig {
  * (`cloudflare/platform.ts` on Workers).
  */
 export interface Platform {
+  /** Local Docker Engine access, supplied only by the Node host. */
+  DOCKER_TRANSPORT?: DockerTransport;
   /** The global store. Request paths take it injected and instrumented (`ctx.db`), never from here. */
   DB: SqlDatabase;
   /** Delivery to session runtimes, addressed by session id. */

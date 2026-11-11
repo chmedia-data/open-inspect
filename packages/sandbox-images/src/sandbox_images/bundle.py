@@ -16,7 +16,7 @@ from .configuration import IMAGE_PACKAGE, RUNTIME_PACKAGE, read_json, runtime_en
 from .locks import export_requirements, update_locks
 
 DOCKER_PACKAGES = ("engine", "cli", "containerd", "buildx", "compose")
-PROVIDERS = ("modal", "daytona", "e2b", "vercel", "boat")
+PROVIDERS = ("modal", "daytona", "e2b", "vercel", "boat", "docker")
 EXCLUDED = {
     ".terraform",
     ".git",
@@ -158,9 +158,14 @@ def plan_image(root: Path, provider: str) -> ImagePlan:
         IMAGE_PACKAGE / "pyproject.toml",
         IMAGE_PACKAGE / "uv.lock",
         IMAGE_PACKAGE / "targets.json",
-        Path(f"packages/{provider}-infra"),
-        Path(f"terraform/modules/{INFRA_MODULES[provider]}"),
     )
+    if provider == "docker":
+        paths += (IMAGE_PACKAGE / "Dockerfile", IMAGE_PACKAGE / "docker")
+    else:
+        paths += (
+            Path(f"packages/{provider}-infra"),
+            Path(f"terraform/modules/{INFRA_MODULES[provider]}"),
+        )
     if provider == "vercel":
         paths += (
             Path("package-lock.json"),
@@ -197,7 +202,10 @@ def pack_bundle(root: Path, provider: str, output_root: Path) -> PackedBundle:
     output_root.mkdir(parents=True, exist_ok=True)
     destination = Path(tempfile.mkdtemp(prefix=f"{provider}-", dir=output_root))
     try:
-        for source in source_files(root, PAYLOAD_ROOTS):
+        payload_roots = PAYLOAD_ROOTS
+        if provider == "docker":
+            payload_roots += (IMAGE_PACKAGE / "Dockerfile", IMAGE_PACKAGE / "docker")
+        for source in source_files(root, payload_roots):
             target = destination / source.relative_to(root)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target, follow_symlinks=False)

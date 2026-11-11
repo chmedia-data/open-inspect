@@ -76,6 +76,14 @@ describe("decryptStoredAccessValue", () => {
 });
 
 describe("resolveSandboxDashboardUrl", () => {
+  it("has no hosted dashboard for Docker", () => {
+    expect(
+      resolveSandboxDashboardUrl(
+        { sandboxProvider: "docker", modalWorkspace: undefined, modalEnvironment: undefined },
+        "container-1"
+      )
+    ).toBeNull();
+  });
   const modal = {
     sandboxProvider: "modal",
     modalWorkspace: "acme",
