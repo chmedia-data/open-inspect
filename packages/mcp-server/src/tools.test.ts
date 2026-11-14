@@ -92,7 +92,7 @@ describe("list_models", () => {
     expect(get).toHaveBeenCalledWith("/models");
     expect(tool("list_models")).toMatchObject({ readOnly: true, requires: "sessions.read" });
     for (const name of ["create_session", "send_prompt", "create_automation"]) {
-      expect(tool(name).inputSchema.model.description).toContain("list_models");
+      expect((tool(name).inputSchema.model as z.ZodType).description).toContain("list_models");
     }
   });
 });
