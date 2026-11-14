@@ -61,6 +61,8 @@ export const sessionRowSchema = z.object({
   max_cost_usd: z.number().nullable(), // Mutable effective session cost limit; NULL = unlimited
   budget_exhausted: z.number(), // 0 = promptable by budget, 1 = paused
   environment_id: z.string().nullable(), // Launch environment provenance; NULL for repo-launched/ad-hoc sessions
+  /** JSON `[{ id, name }]` of the MCP servers pinned at creation; null runs every server in scope. */
+  mcp_selection: z.string().nullish(),
   created_at: z.number(),
   updated_at: z.number(),
 });

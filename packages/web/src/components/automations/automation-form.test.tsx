@@ -124,6 +124,28 @@ vi.mock("@/hooks/use-slack-channels", () => ({
   useSlackChannels: () => ({ channels: [], loading: false }),
 }));
 
+const mcpMocks = vi.hoisted(() => ({
+  servers: [] as Array<Record<string, unknown>>,
+  permissions: ["mcp_connections.use"] as string[],
+  userId: "11111111111111111111111111111111",
+}));
+vi.mock("@/hooks/use-mcp-servers", () => ({
+  useMcpServers: () => ({ servers: mcpMocks.servers, loading: false }),
+  useMcpConnectionStatus: () => new Map(),
+}));
+vi.mock("@/hooks/use-current-user-authorization", () => ({
+  useCurrentUserAuthorization: () => ({
+    hasPermission: (permission: string) => mcpMocks.permissions.includes(permission),
+  }),
+}));
+vi.mock("@/lib/auth-session", () => ({
+  useAuthSession: () => ({ data: { user: { id: mcpMocks.userId } } }),
+}));
+beforeEach(() => {
+  mcpMocks.servers = [];
+  mcpMocks.permissions = ["mcp_connections.use"];
+});
+
 vi.mock("@/components/ui/combobox", () => ({
   Combobox: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
@@ -1774,5 +1796,67 @@ describe("agent harness", () => {
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeDisabled();
     submit();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe("automation MCP servers", () => {
+  const OWNER = "11111111111111111111111111111111";
+  const OTHER = "22222222222222222222222222222222";
+  const mcpServer = (id: string, authMode: string) => ({
+    id,
+    name: id,
+    revision: 1,
+    type: "remote",
+    hasEnv: false,
+    hasHeaders: false,
+    enabled: true,
+    authMode,
+    repoScopes: null,
+  });
+  const values = {
+    name: "Nightly",
+    instructions: "Check things",
+    repositories: singleRepository,
+  };
+
+  it("starts with no server and submits the chosen ones", async () => {
+    mcpMocks.servers = [mcpServer("docs", "none"), mcpServer("tracker", "user_oauth")];
+    const onSubmit = vi.fn();
+    const { container } = render(
+      <AutomationForm mode="create" submitting={false} onSubmit={onSubmit} initialValues={values} />
+    );
+    expect(screen.getByRole("checkbox", { name: /docs/ })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: /tracker/ }));
+    fireEvent.submit(container.querySelector("form")!);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mcpServerIds: ["tracker"] }));
+  });
+
+  it("blocks personal servers without mcp_connections.use", () => {
+    mcpMocks.servers = [mcpServer("tracker", "user_oauth")];
+    mcpMocks.permissions = [];
+    render(
+      <AutomationForm mode="create" submitting={false} onSubmit={vi.fn()} initialValues={values} />
+    );
+    expect(screen.getByRole("checkbox", { name: /tracker/ })).toBeDisabled();
+    expect(
+      screen.getByText("Personal servers need the mcp_connections.use permission.")
+    ).toBeInTheDocument();
+  });
+
+  it("locks an automation using personal servers to its owner", () => {
+    mcpMocks.servers = [mcpServer("tracker", "user_oauth")];
+    const props = {
+      mode: "edit" as const,
+      submitting: false,
+      onSubmit: vi.fn(),
+      initialValues: { ...values, mcpServerIds: ["tracker"] },
+    };
+    const { rerender } = render(<AutomationForm {...props} ownerUserId={OTHER} />);
+    expect(screen.getByText(/only its owner can change it/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Changes" })).toBeDisabled();
+
+    rerender(<AutomationForm {...props} ownerUserId={OWNER} />);
+    expect(screen.queryByText(/only its owner can change it/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
   });
 });

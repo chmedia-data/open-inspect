@@ -156,6 +156,20 @@ The request must authenticate as an authorized human user. The replacement must 
 
 Reading an automation or its run history does not automatically grant access to generated sessions. When a session is not readable, its ID, title, and artifact summary are redacted from run history. Owner break-glass does not enumerate private session details in run lists; an individual run read can apply audited break-glass. See [Workspace access](/administration/workspace-access#how-automation-access-works) and [Teams](/administration/teams).
 
+## MCP servers
+
+Each automation stores the MCP servers its runs' sandboxes start with, chosen under MCP servers in the automation form or sent as `mcpServerIds` on create and update. Every run pins that selection when its session is created.
+
+- The selection starts empty: a new automation runs no MCP server until you pick some. Automations created before selection existed were also given an empty selection, so they no longer get the servers in their scope. Edit them to choose the servers they need.
+- Workspace servers (no authentication or shared service credentials) can be selected on any automation.
+- Personal servers (each user's OAuth connection) act as the automation's executor. They can be selected only on a workspace-owned automation with a Schedule trigger, by its executor acting as themselves (in the web app, or with their own token granted `mcp_connections.use`), and only while their role holds `mcp_connections.use`. Team automations and event triggers (GitHub, Linear, Slack, Sentry, webhooks) are refused, because their runs carry text from outside the team.
+- A personal server is used only on the first turn of a run fired by the schedule or by the executor's own Trigger Now, and only while the executor still holds `mcp_connections.use`, which is checked at every firing, retry, turn, and call. A Trigger Now by anyone else runs without personal servers and records an `mcp` warning. Follow-up turns (Slack thread replies, webhook follow-ups) never use them.
+- The executor must have connected the server under Settings › Connections; a missing or expired connection is reported as an `mcp` warning on the run, and the other servers keep working.
+
+### Owner lock
+
+While an automation's selection includes a personal server, only its executor, acting as themselves, can edit it: instructions, trigger, targets, agent, model, or MCP servers. Anyone else, workspace Administrators and Owners included, gets `403 automation_owner_locked`, and the executor cannot be reassigned until the executor removes the personal servers. Pausing, resuming, and deleting stay open to everyone who could do them before, so a runaway automation can always be stopped.
+
 ## Automation statuses
 
 The badge on each automation shows one of three states:

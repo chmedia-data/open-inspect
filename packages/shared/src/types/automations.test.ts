@@ -268,6 +268,34 @@ describe("automation provider selection contracts", () => {
   });
 });
 
+describe("automation MCP selection contracts", () => {
+  it("accepts server ids on create and update, and omits them when not sent", () => {
+    expect(
+      createAutomationRequestSchema.parse({ name: "n", instructions: "i", mcpServerIds: ["s1"] })
+        .mcpServerIds
+    ).toEqual(["s1"]);
+    expect(updateAutomationRequestSchema.parse({ name: "Renamed" })).not.toHaveProperty(
+      "mcpServerIds"
+    );
+    expect(updateAutomationRequestSchema.parse({ mcpServerIds: [] })).toEqual({ mcpServerIds: [] });
+  });
+
+  it("refuses duplicate ids", () => {
+    expect(updateAutomationRequestSchema.safeParse({ mcpServerIds: ["a", "a"] }).success).toBe(
+      false
+    );
+  });
+
+  it("reads an automation from a control plane that predates MCP selection as selecting none", () => {
+    const parsed = listAutomationsResponseSchema.parse({
+      automations: [{ ...automation, recentExecutions: [] }],
+      hasMore: false,
+      nextCursor: null,
+    });
+    expect(parsed.automations[0].mcpServerIds).toEqual([]);
+  });
+});
+
 describe("automation request boundary contracts", () => {
   it.each([createAutomationRequestSchema, updateAutomationRequestSchema])(
     "accepts canonical, unique environment ids",

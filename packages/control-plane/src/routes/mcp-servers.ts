@@ -201,6 +201,12 @@ const MCP_READ = admit({
   ...GITHUB_USER_OR_SERVICE_ROUTE,
   authorization: requirePermission("mcp_servers.read"),
 });
+/** Listing servers, which a personal access token granted `mcp_servers.read` may also do. */
+const MCP_LIST_FOR_TOKENS = admit({
+  ...GITHUB_USER_OR_SERVICE_ROUTE,
+  authorization: requirePermission("mcp_servers.read"),
+  personalAccessTokens: "accept",
+});
 const MCP_MANAGE = admit({
   ...GITHUB_USER_OR_SERVICE_ROUTE,
   authorization: requirePermission("mcp_servers.manage"),
@@ -240,7 +246,7 @@ async function handleRevokeMcpConnections(
 
 export const mcpServerRoutes = new Hono<ControlPlaneHonoEnv>();
 
-mcpServerRoutes.get("/mcp-servers", MCP_READ, (c) => dispatch(c, handleListMcpServers));
+mcpServerRoutes.get("/mcp-servers", MCP_LIST_FOR_TOKENS, (c) => dispatch(c, handleListMcpServers));
 mcpServerRoutes.post("/mcp-servers", MCP_MANAGE, (c) => dispatch(c, handleCreateMcpServer));
 mcpServerRoutes.get("/mcp-servers/:id", MCP_READ, (c) => dispatch(c, handleGetMcpServer));
 mcpServerRoutes.put("/mcp-servers/:id", MCP_MANAGE, (c) => dispatch(c, handleUpdateMcpServer));

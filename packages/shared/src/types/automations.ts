@@ -12,6 +12,7 @@ import {
 } from "./repositories";
 import type { RepositoryInput, RepositoryRef } from "./repositories";
 import { modelProviderSelectionsSchema } from "./provider-accounts";
+import { mcpServerIdsSchema } from "./managed-mcp";
 import { isEnvironmentId } from "./environments";
 import { isCanonicalUserId } from "../user-id";
 
@@ -159,6 +160,11 @@ const automationSchema = z.object({
   repositories: z.array(automationRepositorySchema),
   environmentIds: z.array(z.string()),
   providerSelections: modelProviderSelectionsSchema,
+  /**
+   * MCP servers each run's sandbox runs; empty runs none. Defaulted so a web build that deploys
+   * before its control plane still parses responses.
+   */
+  mcpServerIds: z.array(z.string()).default([]),
 });
 
 export type Automation = z.infer<typeof automationSchema>;
@@ -248,6 +254,12 @@ export const createAutomationRequestSchema = z.object({
    * none.
    */
   maxRetries: maxRetriesSchema.optional(),
+  /**
+   * MCP servers each run's sandbox runs. Omission or an empty list runs none. Personal
+   * (`user_oauth`) servers act as the automation's owner and are refused for team automations and
+   * for triggers other than a schedule.
+   */
+  mcpServerIds: mcpServerIdsSchema.optional(),
 });
 export type CreateAutomationRequest = z.input<typeof createAutomationRequestSchema>;
 
@@ -270,6 +282,8 @@ export const updateAutomationRequestSchema = z.object({
   providerSelections: modelProviderSelectionsSchema.optional(),
   /** Launch retries for scheduled runs; only schedule triggers may set above 0. */
   maxRetries: maxRetriesSchema.optional(),
+  /** Replaces the MCP server selection when present; an empty list selects none. */
+  mcpServerIds: mcpServerIdsSchema.optional(),
 });
 export type UpdateAutomationRequest = z.input<typeof updateAutomationRequestSchema>;
 

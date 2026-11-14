@@ -32,6 +32,12 @@ import { initializeSession } from "../session/initialize";
 import { resolveSessionScopedSettings } from "../session/integration-settings-resolution";
 import { resolveManagedSkills } from "../session/skill-resolution";
 import {
+  PERSONAL_MCP_PERMISSION,
+  personalMcpServerIds,
+  pinStoredMcpSelection,
+} from "../mcp/selection";
+import { isPersonalMcpEligible } from "./personal-mcp-eligibility";
+import {
   AutomationSessionService,
   type AutomationSessionServiceDeps,
 } from "./automation-session-service";
@@ -97,6 +103,8 @@ export function createScheduler(
       resolveSessionScopedSettings(db, members, environmentId),
     resolveSkills: (target, selection, userId) =>
       resolveManagedSkills(db, target, selection, userId),
+    pinMcpSelection: (serverIds) =>
+      pinStoredMcpSelection(db, env.REPO_SECRETS_ENCRYPTION_KEY, serverIds),
     teams,
     isAuthorized: (request) => isAutomationExecutionAuthorized(db, request),
     selectMemory: (ctx, request) => createSessionMemorySelector(ctx).select(request),
@@ -142,6 +150,22 @@ export function createScheduler(
     launcher,
     failures,
     attribution,
+    personalMcp: {
+      isEligible: (input) =>
+        isPersonalMcpEligible(
+          {
+            personalServerIds: (serverIds) =>
+              personalMcpServerIds(db, env.REPO_SECRETS_ENCRYPTION_KEY, serverIds),
+            holdsPersonalMcpPermission: async (userId) => {
+              const owner = await new AuthorizationService(db).getEffectiveAuthorization(userId);
+              return (
+                owner.suspendedAt === null && owner.permissions.includes(PERSONAL_MCP_PERMISSION)
+              );
+            },
+          },
+          input
+        ),
+    },
     isAuthorized: (request) => isAutomationExecutionAuthorized(db, request),
     resolveRepositories: (repositories) => resolveAutomationRepositories(env, repositories),
     clock: Date,

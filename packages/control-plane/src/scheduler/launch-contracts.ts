@@ -13,6 +13,11 @@ export interface ExecutionPrincipal {
    * both here and in the live role. Absent for unattended firings, which run with the owner's role.
    */
   permissionCeiling?: AutomationExecutionAuthorizationRequest["permissionCeiling"];
+  /**
+   * Whether the run's first prompt may use the automation's personal MCP servers as its owner,
+   * decided at admission (see `isPersonalMcpEligible`). Absent means it may not.
+   */
+  mcpEligible?: boolean;
 }
 
 /** What admission decided for a firing, re-checked as each child launches. */

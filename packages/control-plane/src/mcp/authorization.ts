@@ -11,8 +11,16 @@ import { SessionCollaboratorStore } from "../db/session-collaborators";
 import type { SqlDatabase } from "../db/sql-database";
 import type { Env } from "../types";
 import { McpError } from "./errors";
+import { PERSONAL_MCP_PERMISSION } from "./selection";
 
-/** No request/session positive cache: invoked again after credential I/O. */
+/**
+ * Whether `userId` may act through their personal MCP connections in this session right now:
+ * active, holding `mcp_connections.use` in their live role, and able to read and collaborate on
+ * the session. Checked on every turn and every relayed call, so losing any of these stops
+ * personal calls at once, including for automation runs queued long before.
+ *
+ * No request/session positive cache: invoked again after credential I/O.
+ */
 export async function assertMcpUserAccess(
   db: SqlDatabase,
   env: Env,
@@ -25,7 +33,12 @@ export async function assertMcpUserAccess(
     new TeamMembershipStore(db).listForUser(userId),
     new SessionCollaboratorStore(db).listUserIds(sessionId),
   ]);
-  if (!session || authorization.suspendedAt !== null) throw new McpError("mcp_denied");
+  if (
+    !session ||
+    authorization.suspendedAt !== null ||
+    !authorization.permissions.includes(PERSONAL_MCP_PERMISSION)
+  )
+    throw new McpError("mcp_denied");
   const mode = parseTeamsEnforcementMode(env.TEAMS_ENFORCEMENT);
   const row = { ...session, ownerUserId: session.userId ?? null, collaboratorIds };
   const viewer = {

@@ -538,15 +538,23 @@ export class McpServerStore {
    * Pass an empty list for repo-less sessions (unscoped servers only).
    * Servers the control plane proxies (managed routing, which every personal
    * OAuth server uses) come without their stored credentials.
+   *
+   * `selectedIds`, when given, narrows that set to the listed servers; it never
+   * widens it, so a selected server that is disabled, deleted or out of scope is
+   * left out. An empty list loads nothing.
    */
   async getForLaunch(
-    repositories: Array<{ repoOwner: string; repoName: string }>
+    repositories: Array<{ repoOwner: string; repoName: string }>,
+    selectedIds?: readonly string[] | null
   ): Promise<McpServerConfig[]> {
+    if (selectedIds && selectedIds.length === 0) return [];
+    const selected = selectedIds ? new Set(selectedIds) : null;
     const names = new Set(repositories.map((r) => `${r.repoOwner}/${r.repoName}`.toLowerCase()));
     const { results } = await this.db
       .prepare("SELECT * FROM mcp_servers WHERE enabled = 1 ORDER BY name")
       .all<McpServerRow>();
     const rows = results.filter((row) => {
+      if (selected && !selected.has(row.id)) return false;
       const scopes = parseRepoScopes(row.repo_scope);
       return !scopes || scopes.some((scope) => names.has(scope.toLowerCase()));
     });

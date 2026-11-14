@@ -30,6 +30,7 @@ import {
 } from "../model-provider-accounts/provider-auth-contracts";
 import { bulkInsertStatements } from "./bulk-insert";
 import { SessionMemorySelectionStore } from "./session-memory-selections";
+import { SessionMcpSelectionStore, type SessionMcpSelectionPin } from "./session-mcp-selections";
 import { SessionStatusProjectionStore } from "./session-status-projection-store";
 import { attachSessionListMetadata } from "./session-list-metadata";
 import { buildSessionListPredicates, type SessionListFilters } from "./session-list-predicates";
@@ -133,6 +134,8 @@ export interface CreateSessionCommand extends SessionEntry {
   memory?: SessionMemoryPin;
   /** Managed-skill manifest to pin atomically with the session row. */
   managedSkills?: Pinned<SessionSkillManifestInput>;
+  /** MCP selection to pin atomically with the session row; absent leaves the legacy `all`. */
+  mcpSelection?: SessionMcpSelectionPin;
   /** Complete immutable model-provider authentication snapshot. */
   providerAuth?: SessionModelProviderAuthInput[];
   /** Copy access grants with the parent row in the creation batch. */
@@ -318,6 +321,9 @@ export class SessionIndexStore {
     );
     const results = await this.db.batch([
       sessionStmt,
+      ...(session.mcpSelection
+        ? new SessionMcpSelectionStore(this.db).bindPin(session.id, session.mcpSelection)
+        : []),
       ...repositoryStmts,
       ...manifestStmts,
       ...(session.memory

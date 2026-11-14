@@ -60,6 +60,7 @@ describe("session provider auth persistence", () => {
         platformUserId: null,
         participantCanonicalUserId: null,
         memory: resolvedPin(await emptySelection(1)),
+        mcpSelection: resolvedPin({ mode: "all" }),
         managedSkills: resolvedPin({
           selection: { mode: "all" },
           resolverVersion: 1,

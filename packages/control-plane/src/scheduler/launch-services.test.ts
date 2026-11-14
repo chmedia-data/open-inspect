@@ -272,6 +272,12 @@ function sessionHarness() {
       resolvedAt: 1_000,
       skills: [],
     }),
+    pinMcpSelection: vi
+      .fn<AutomationSessionServiceDeps["pinMcpSelection"]>()
+      .mockImplementation(async (serverIds) => ({
+        mode: "selected",
+        servers: serverIds.map((id) => ({ id, name: `name-${id}` })),
+      })),
     teams: {
       getById: vi.fn<AutomationSessionServiceDeps["teams"]["getById"]>().mockResolvedValue(team),
     },
@@ -332,6 +338,38 @@ describe("AutomationSessionService", () => {
       deps.initializeSession,
     ].map((fn) => fn.mock.invocationCallOrder[0]);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("pins exactly the automation's stored MCP servers, and none when it selects none", async () => {
+    const { deps, service, input } = sessionHarness();
+    await service.create({
+      ...input,
+      automation: { ...input.automation, mcp_server_ids: JSON.stringify(["s1", "s2"]) },
+    });
+    expect(deps.pinMcpSelection).toHaveBeenLastCalledWith(["s1", "s2"]);
+    expect(deps.initializeSession).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        mcpSelection: {
+          kind: "resolved",
+          value: {
+            mode: "selected",
+            servers: [
+              { id: "s1", name: "name-s1" },
+              { id: "s2", name: "name-s2" },
+            ],
+          },
+        },
+      }),
+      expect.anything()
+    );
+
+    await service.create({ ...input, automation: { ...input.automation, mcp_server_ids: "[]" } });
+    expect(deps.initializeSession).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        mcpSelection: { kind: "resolved", value: { mode: "selected", servers: [] } },
+      }),
+      expect.anything()
+    );
   });
 
   it("reuses a team's admitted target but reads current visibility and authority", async () => {
