@@ -575,3 +575,79 @@ describe("skills with a token", () => {
     );
   });
 });
+
+describe("choosing models with a token", () => {
+  const ENABLED = "anthropic/claude-haiku-4-5";
+
+  async function enableOnly(models: string[]) {
+    await env.DB.prepare(
+      "INSERT INTO model_preferences (id, enabled_models, updated_at) VALUES ('global', ?, ?)"
+    )
+      .bind(JSON.stringify(models), Date.now())
+      .run();
+  }
+
+  it("lists the catalog with enablement, harnesses and the default", async () => {
+    await enableOnly([ENABLED]);
+    const reader = await issueToken(OWNER, ["sessions.read"]);
+    const response = await withToken(reader, "/models");
+    expect(response.status).toBe(200);
+    const body = await response.json<{
+      defaultModel: string;
+      models: { id: string; enabled: boolean; harnesses: { harness: string }[] }[];
+    }>();
+    expect(body.defaultModel).toEqual(expect.any(String));
+    expect(body.models.filter((model) => model.enabled).map((model) => model.id)).toEqual([
+      ENABLED,
+    ]);
+    const haiku = body.models.find((model) => model.id === ENABLED);
+    expect(haiku?.harnesses.map((entry) => entry.harness)).toEqual(
+      expect.arrayContaining(["opencode", "claude"])
+    );
+
+    const unrelated = await issueToken(OWNER, ["automations.read"]);
+    await expectRefusal(await withToken(unrelated, "/models"), 403, "permission_required");
+  });
+
+  it("rejects an unknown, disabled or harness-incompatible model on create", async () => {
+    await enableOnly([ENABLED, "openai/gpt-5.4"]);
+    const creator = await issueToken(OWNER, ["sessions.create"]);
+    const create = (body: Record<string, unknown>) =>
+      withToken(creator, "/sessions", { method: "POST", body: { title: "t", ...body } });
+
+    const unknown = await create({ model: "amazon-bedrock/moonshotai.kimi-k2.5" });
+    expect(unknown.status).toBe(400);
+    expect((await unknown.json<{ error: string }>()).error).toContain(
+      'Unknown model "amazon-bedrock/moonshotai.kimi-k2.5"'
+    );
+
+    const disabled = await create({ model: "anthropic/claude-sonnet-4-6" });
+    expect(disabled.status).toBe(400);
+    expect((await disabled.json<{ error: string }>()).error).toContain("is not enabled");
+
+    const mismatch = await create({ model: "openai/gpt-5.4", harness: "claude" });
+    expect(mismatch.status).toBe(400);
+    expect((await mismatch.json<{ error: string }>()).error).toContain("cannot run on the Claude");
+
+    expect((await create({ model: ENABLED })).status).toBe(201);
+    expect((await create({})).status).toBe(201);
+  });
+
+  it("rejects an unknown or disabled model on a prompt instead of ignoring it", async () => {
+    await enableOnly([ENABLED]);
+    const { sessionName } = await initSession({ userId: OWNER });
+    const collaborator = await issueToken(OWNER, ["sessions.collaborate"]);
+    const prompt = (model?: string) =>
+      withToken(collaborator, `/sessions/${sessionName}/prompt`, {
+        method: "POST",
+        body: { content: "hi", model },
+      });
+
+    const unknown = await prompt("amazon-bedrock/moonshotai.kimi-k2.5");
+    expect(unknown.status).toBe(400);
+    expect((await unknown.json<{ error: string }>()).error).toContain("Unknown model");
+    expect((await prompt("anthropic/claude-sonnet-4-6")).status).toBe(400);
+    expect((await prompt(ENABLED)).status).toBeLessThan(300);
+    expect((await prompt()).status).toBeLessThan(300);
+  });
+});

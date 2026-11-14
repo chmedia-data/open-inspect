@@ -112,6 +112,7 @@ Each tool's description states the grant it needs, so the assistant can tell you
 
 | Tool                          | Route                                              | Grant                                                  |
 | ----------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| `list_models`                 | `GET /models`                                      | `sessions.read`                                        |
 | `list_sessions`               | `GET /sessions`                                    | `sessions.read`                                        |
 | `get_session_events`          | `GET /sessions/:id/events`                         | `sessions.read`                                        |
 | `get_session_messages`        | `GET /sessions/:id/messages`                       | `sessions.read`                                        |
@@ -166,6 +167,12 @@ by target repository (`repo_owner`, `repo_name`, either alone).
 
 - `create_session` starts a session as you, on one repository or an environment, and with `prompt`
   sends its first prompt in the same call.
+- `list_models` lists the models you can pass as `model`, with whether each is enabled, the
+  harnesses that run it, and the installation default. `create_session`, `send_prompt` and
+  `create_automation` reject an unknown, disabled or harness-incompatible `model` with an error that
+  names the model and lists the valid ones; omit `model` to use the default. A token limited to
+  automations cannot call `list_models`; add `sessions.read`. The list does not check provider
+  credentials, so an enabled model can still fail at run time if its provider is not configured.
 - `send_prompt` prompts a session you may collaborate on; it queues behind a running prompt.
 - `stop_session` stops the running prompt; the session stays and `send_prompt` continues it.
 
