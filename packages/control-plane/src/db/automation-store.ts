@@ -94,6 +94,11 @@ export interface AutomationRow {
    * Optional so rows built for insert may omit it; the column defaults to no retries.
    */
   max_retries?: number;
+  /**
+   * JSON array of the MCP server ids each run selects; `[]` runs none. Optional so rows built for
+   * insert may omit it; the column defaults to none.
+   */
+  mcp_server_ids?: string;
   created_by: string;
   user_id: string | null;
   owner_team_id: string | null;
@@ -397,7 +402,22 @@ export function toAutomation(
     repositories: repositoryRows.map(toAutomationRepository),
     environmentIds: environmentRows.map((environment) => environment.environment_id),
     providerSelections: toProviderSelections(providerAuthRows),
+    mcpServerIds: parseAutomationMcpServerIds(row),
   };
+}
+
+/**
+ * The MCP server ids an automation selects. A malformed stored value selects none, so a corrupt
+ * row can never widen what its runs load.
+ */
+export function parseAutomationMcpServerIds(row: Pick<AutomationRow, "mcp_server_ids">): string[] {
+  if (!row.mcp_server_ids) return [];
+  try {
+    const parsed: unknown = JSON.parse(row.mcp_server_ids);
+    return Array.isArray(parsed) && parsed.every((id) => typeof id === "string") ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 export function toAutomationRun(row: EnrichedRunRow): AutomationRun {
@@ -541,8 +561,9 @@ export class AutomationStore {
          (id, name, instructions,
           trigger_type, schedule_cron, schedule_tz, harness, model, reasoning_effort, enabled, next_run_at,
           consecutive_failures, created_by, user_id, created_at, updated_at, deleted_at,
-           event_type, trigger_config, trigger_auth_data, owner_team_id, schedule_once_at, max_retries)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           event_type, trigger_config, trigger_auth_data, owner_team_id, schedule_once_at, max_retries,
+           mcp_server_ids)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         row.id,
@@ -567,7 +588,8 @@ export class AutomationStore {
         row.trigger_auth_data,
         row.owner_team_id,
         row.schedule_once_at,
-        row.max_retries ?? 0
+        row.max_retries ?? 0,
+        row.mcp_server_ids ?? "[]"
       );
   }
 
@@ -791,6 +813,7 @@ export class AutomationStore {
       "enabled",
       "consecutive_failures",
       "max_retries",
+      "mcp_server_ids",
       "event_type",
       "trigger_config",
       "trigger_auth_data",
