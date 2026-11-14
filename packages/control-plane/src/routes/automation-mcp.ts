@@ -154,6 +154,45 @@ export async function validateAutomationMcpSelection(
   return null;
 }
 
+/** The personal servers an automation's stored selection currently names. */
+async function storedPersonalServers(
+  ctx: RequestContext,
+  env: Env,
+  automation: AutomationRow
+): Promise<McpServerMetadata[]> {
+  const storedIds = parseAutomationMcpServerIds(automation);
+  const servers = await serversById(ctx.db, env, storedIds);
+  return storedIds
+    .map((id) => servers.get(id))
+    .filter((server): server is McpServerMetadata => !!server && isUserOAuthServer(server));
+}
+
+/**
+ * Executor reassignment under the owner lock. Runs act as the executor, so handing an automation
+ * that selects personal servers to someone else would use their connections on instructions they
+ * never chose, and would let the new executor edit what the owner locked. Refused for everyone
+ * while any personal server is selected; the owner removes them first. Returns the refusal, or null.
+ */
+export async function automationExecutorLock(
+  ctx: RequestContext,
+  env: Env,
+  automation: AutomationRow
+): Promise<Response | null> {
+  const personal = await storedPersonalServers(ctx, env, automation);
+  if (personal.length === 0) return null;
+  return json(
+    {
+      error: `This automation uses personal MCP servers (${personal
+        .map((server) => server.name)
+        .join(
+          ", "
+        )}) that act as its executor. Its owner must remove them before the executor can change.`,
+      code: "automation_owner_locked",
+    },
+    403
+  );
+}
+
 /**
  * The owner lock: while an automation's stored selection names a personal server, its runs act as
  * the owner at external services, so only the owner acting as themselves may change it. Anyone
@@ -167,11 +206,7 @@ export async function automationOwnerLock(
 ): Promise<Response | null> {
   // The owner may always edit: keeping personal servers then still needs their permission.
   if (actsAsUser(ctx, automation.user_id)) return null;
-  const storedIds = parseAutomationMcpServerIds(automation);
-  const servers = await serversById(ctx.db, env, storedIds);
-  const personal = storedIds
-    .map((id) => servers.get(id))
-    .filter((server): server is McpServerMetadata => !!server && isUserOAuthServer(server));
+  const personal = await storedPersonalServers(ctx, env, automation);
   if (personal.length === 0) return null;
   return json(
     {

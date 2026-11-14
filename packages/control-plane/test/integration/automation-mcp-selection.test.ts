@@ -289,6 +289,25 @@ describe("the owner lock", () => {
     );
   });
 
+  it("refuses to change the executor while personal servers are selected", async () => {
+    await saveAutomation("auto-handoff", OWNER, ["srv-tracker"]);
+    await expectRefusal(
+      await asUser(ADMIN, "/automations/auto-handoff", {
+        method: "PATCH",
+        body: { userId: ADMIN },
+      }),
+      403,
+      "automation_owner_locked"
+    );
+    expect((await new AutomationStore(env.DB).getById("auto-handoff"))?.user_id).toBe(OWNER);
+
+    await saveAutomation("auto-plain", OWNER, ["srv-docs"]);
+    expect(
+      (await asUser(ADMIN, "/automations/auto-plain", { method: "PATCH", body: { userId: ADMIN } }))
+        .status
+    ).toBe(200);
+  });
+
   it("does not lock on a personal server that has since been deleted", async () => {
     await saveAutomation("auto-dangling", OWNER, ["srv-gone"]);
     expect(
