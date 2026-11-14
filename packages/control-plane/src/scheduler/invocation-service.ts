@@ -36,6 +36,7 @@ import type { AutomationRunLaunchService } from "./run-launch-service";
 import type { AutomationFailureService } from "./failure-service";
 import { AutomationExecutionUnauthorizedError } from "./contracts";
 import type { StartInvocationResult } from "./invocation-outcome";
+import type { PersonalMcpEligibilityInput } from "./personal-mcp-eligibility";
 
 export interface StartInvocationParams {
   automation: AutomationRow;
@@ -111,6 +112,8 @@ export interface AutomationInvocationServiceDeps {
   ): ReturnType<typeof resolveAutomationRepositories>;
   admission: LaunchAdmissionOperations;
   attribution: Pick<AutomationAttributionService, "resolve">;
+  /** Whether a firing may use the automation's personal MCP servers as its owner. */
+  personalMcp: { isEligible(input: PersonalMcpEligibilityInput): Promise<boolean> };
   launcher: Pick<AutomationRunLaunchService, "launch" | "recordFailure">;
   failures: Pick<AutomationFailureService, "applyInvocationOutcome">;
   clock: Pick<DateConstructor, "now">;
@@ -372,6 +375,14 @@ export class AutomationInvocationService {
       }
     }
 
+    if (launchCandidates.length > 0) {
+      executionPrincipal.mcpEligible = await this.personalMcpEligible({
+        automation,
+        source,
+        executionPrincipal,
+      });
+    }
+
     // Admitted. Only now is it worth paying for anything the prompt needs.
     // Contain provider failures here: children already exist in `starting`, so
     // a rejected lazy override must not escape and strand persisted state.
@@ -420,6 +431,20 @@ export class AutomationInvocationService {
     }
 
     return { outcome: "started", invocationId, runs: children, launched };
+  }
+
+  /** Eligibility that fails closed: a lookup error runs the firing without personal servers. */
+  private async personalMcpEligible(input: PersonalMcpEligibilityInput): Promise<boolean> {
+    try {
+      return await this.deps.personalMcp.isEligible(input);
+    } catch (error) {
+      this.deps.log.warn("Failed to decide personal MCP eligibility; running without", {
+        event: "scheduler.personal_mcp_eligibility_failed",
+        automation_id: input.automation.id,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      return false;
+    }
   }
 
   /**
@@ -634,6 +659,12 @@ export class AutomationInvocationService {
     } catch (error) {
       launchError = error;
     }
+    // Only scheduled firings retry; the owner's role is read again for this attempt.
+    executionPrincipal.mcpEligible = await this.personalMcpEligible({
+      automation,
+      source: "schedule",
+      executionPrincipal,
+    });
     return {
       automation,
       teamGrantsVersion,
