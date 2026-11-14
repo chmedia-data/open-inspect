@@ -31,7 +31,12 @@ import { createSessionMemorySelector } from "../memory/session-memory-selector-f
 import { initializeSession } from "../session/initialize";
 import { resolveSessionScopedSettings } from "../session/integration-settings-resolution";
 import { resolveManagedSkills } from "../session/skill-resolution";
-import { pinStoredMcpSelection } from "../mcp/selection";
+import {
+  PERSONAL_MCP_PERMISSION,
+  personalMcpServerIds,
+  pinStoredMcpSelection,
+} from "../mcp/selection";
+import { isPersonalMcpEligible } from "./personal-mcp-eligibility";
 import {
   AutomationSessionService,
   type AutomationSessionServiceDeps,
@@ -145,6 +150,22 @@ export function createScheduler(
     launcher,
     failures,
     attribution,
+    personalMcp: {
+      isEligible: (input) =>
+        isPersonalMcpEligible(
+          {
+            personalServerIds: (serverIds) =>
+              personalMcpServerIds(db, env.REPO_SECRETS_ENCRYPTION_KEY, serverIds),
+            holdsPersonalMcpPermission: async (userId) => {
+              const owner = await new AuthorizationService(db).getEffectiveAuthorization(userId);
+              return (
+                owner.suspendedAt === null && owner.permissions.includes(PERSONAL_MCP_PERMISSION)
+              );
+            },
+          },
+          input
+        ),
+    },
     isAuthorized: (request) => isAutomationExecutionAuthorized(db, request),
     resolveRepositories: (repositories) => resolveAutomationRepositories(env, repositories),
     clock: Date,
