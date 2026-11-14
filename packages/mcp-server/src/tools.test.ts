@@ -82,6 +82,21 @@ function fakeClient(handlers: {
   return { client, get, post };
 }
 
+describe("list_models", () => {
+  it("reads the model catalog route and points the model fields at it", async () => {
+    const { client, get } = fakeClient({ get: () => ({ defaultModel: "x", models: [] }) });
+    await expect(tool("list_models").run(client, {})).resolves.toEqual({
+      defaultModel: "x",
+      models: [],
+    });
+    expect(get).toHaveBeenCalledWith("/models");
+    expect(tool("list_models")).toMatchObject({ readOnly: true, requires: "sessions.read" });
+    for (const name of ["create_session", "send_prompt", "create_automation"]) {
+      expect((tool(name).inputSchema.model as z.ZodType).description).toContain("list_models");
+    }
+  });
+});
+
 describe("tool surface", () => {
   it("lists every tool over a real transport, schemas converted and hints set", async () => {
     // tools/list is where a zod shape the SDK cannot convert to JSON Schema
@@ -113,7 +128,7 @@ describe("tool surface", () => {
       "trigger_automation",
       "update_skill_from_git",
     ]);
-    expect(tools).toHaveLength(16);
+    expect(tools).toHaveLength(17);
     // Re-import moves the skill's current revision, which is what later
     // sessions load; a client reads this to decide how hard to prompt.
     const hints = Object.fromEntries(

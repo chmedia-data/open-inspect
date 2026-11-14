@@ -209,6 +209,19 @@ const importRef = z
 
 export const TOOLS: ToolDefinition[] = [
   defineTool({
+    name: "list_models",
+    requires: "sessions.read",
+    title: "List models",
+    readOnly: true,
+    description:
+      "List the models a session or automation can run: id, display name, category, whether " +
+      "this installation has it enabled, the harnesses that run it with their reasoning efforts, " +
+      "and the installation's default model. Pass an enabled model's id as `model` to " +
+      "create_session, send_prompt or create_automation; an unknown or disabled model is rejected.",
+    inputSchema: {},
+    run: (client) => client.get("/models"),
+  }),
+  defineTool({
     name: "list_sessions",
     requires: "sessions.read",
     title: "List sessions",
@@ -343,7 +356,10 @@ export const TOOLS: ToolDefinition[] = [
         .string()
         .min(1)
         .optional()
-        .describe("Model, such as openai/gpt-6.1-sol. Defaults to the installation's default."),
+        .describe(
+          "Model id from list_models, such as openai/gpt-6.1-sol. Defaults to the installation's " +
+            "default. An unknown or disabled model is rejected."
+        ),
       reasoning_effort: z
         .string()
         .min(1)
@@ -398,7 +414,10 @@ export const TOOLS: ToolDefinition[] = [
         .string()
         .min(1)
         .optional()
-        .describe("Model for this prompt. Defaults to the session's model."),
+        .describe(
+          "Model id from list_models for this prompt. Defaults to the session's model. An " +
+            "unknown or disabled model is rejected."
+        ),
       reasoning_effort: z.string().min(1).optional().describe("Reasoning effort for this prompt"),
     },
     run: (client, args) =>
@@ -605,7 +624,10 @@ export const TOOLS: ToolDefinition[] = [
         .string()
         .min(1)
         .optional()
-        .describe("Model each run uses. Defaults to the installation's default model."),
+        .describe(
+          "Model id from list_models that each run uses. Defaults to the installation's default " +
+            "model. An unknown or disabled model is rejected."
+        ),
       reasoning_effort: z
         .string()
         .min(1)
