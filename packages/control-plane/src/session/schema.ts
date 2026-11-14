@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS session (
   max_cost_usd REAL,                                -- Mutable effective session cost limit; NULL = unlimited
   budget_exhausted INTEGER NOT NULL DEFAULT 0,      -- Pauses prompt admission and dispatch
   environment_id TEXT,                              -- Launch environment provenance; NULL for repo-launched/ad-hoc sessions
+  mcp_selection TEXT,                               -- JSON [{id, name}] of pinned MCP servers; NULL = every server in scope
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   CHECK (
@@ -804,6 +805,11 @@ export const MIGRATIONS: readonly SchemaMigration[] = [
     id: 59,
     description: "Distinguish bridge process replacement from transport reconnect",
     run: "ALTER TABLE sandbox ADD COLUMN mcp_bridge_instance_id TEXT",
+  },
+  {
+    id: 60,
+    description: "Pin the session's MCP server selection",
+    run: "ALTER TABLE session ADD COLUMN mcp_selection TEXT",
   },
 ];
 
