@@ -236,6 +236,26 @@ describe("sessions API route (POST)", () => {
     });
   });
 
+  it("forwards the MCP selection", async () => {
+    vi.mocked(controlPlaneUserFetch).mockResolvedValue(
+      Response.json({ id: "sess-mcp" }, { status: 201 })
+    );
+
+    await POST(
+      postRequest({
+        repoOwner: "acme",
+        repoName: "web",
+        mcpSelection: { mode: "selected", serverIds: ["mcp_1"] },
+      })
+    );
+
+    expect(controlPlaneBody()).toEqual({
+      repoOwner: "acme",
+      repoName: "web",
+      mcpSelection: { mode: "selected", serverIds: ["mcp_1"] },
+    });
+  });
+
   it("forwards bounded provider selections without forwarding adjacent hostile fields", async () => {
     vi.mocked(controlPlaneUserFetch).mockResolvedValue(
       Response.json({ id: "sess-provider" }, { status: 201 })

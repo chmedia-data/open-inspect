@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { createSessionResponseSchema } from "@open-inspect/shared/types/session-api";
 import type { HarnessId } from "@open-inspect/shared/harnesses";
 import type { ModelProviderSelections } from "@open-inspect/shared/types/provider-accounts";
+import type { SessionMcpSelection } from "@open-inspect/shared/types/integrations";
 import type { SessionSkillSelection } from "@open-inspect/shared/types/skills";
 import type { SessionVisibility } from "@open-inspect/shared/types/teams";
 import { browserApiFetch } from "@/lib/browser-api-fetch";
@@ -16,6 +17,7 @@ export type WarmDraftSessionRequest = SessionTargetRequestFields & {
   model: string;
   reasoningEffort?: string;
   skillSelection: SessionSkillSelection;
+  mcpSelection?: SessionMcpSelection;
   includePersonalMemories?: boolean;
   providerSelections: ModelProviderSelections;
   teamId: string | null;

@@ -61,6 +61,7 @@ const automation: AutomationListItem = {
   repositories: [],
   environmentIds: [],
   providerSelections: {},
+  mcpServerIds: [],
   recentExecutions: [],
   capabilities: { canRead: true, canManage: true, canTrigger: true },
 };
