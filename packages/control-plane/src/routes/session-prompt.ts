@@ -25,6 +25,8 @@ import {
 } from "../authorization/personal-access-token-policy";
 import { UserStore } from "../db/user-store";
 import { createLogger } from "../logger";
+import { getValidHarnessOrDefault } from "@open-inspect/shared/harnesses";
+import { HarnessAdmissionError, resolveRequestedModel } from "../harness-admission";
 import { SessionInternalPaths } from "../session/contracts";
 import type { EnqueuePromptRequest } from "../session/enqueue-prompt-contract";
 import { resolveGitHubEnrichmentForRequest, type GitHubEnrichment } from "../session/identity";
@@ -115,6 +117,18 @@ export async function handleSessionPrompt(
         canonicalUserId,
         await resolveGitHubCredentialAuthority(ctx, request.headers)
       )) ?? undefined;
+  }
+
+  // A per-prompt model is rejected here when unknown or disabled, instead of being dropped by the
+  // session. Harness compatibility is checked by the session against its own harness.
+  if (body.model) {
+    const session = await new SessionIndexStore(ctx.db).get(sessionId);
+    try {
+      await resolveRequestedModel(ctx.db, getValidHarnessOrDefault(session?.harness), body.model);
+    } catch (cause) {
+      if (cause instanceof HarnessAdmissionError) return error(cause.message, cause.status);
+      throw cause;
+    }
   }
 
   const promptRequest = {
