@@ -45,6 +45,8 @@ export interface AutomationFormValues {
   triggerConfig?: TriggerConfig;
   sentryClientSecret?: string;
   providerSelections: ModelProviderSelections;
+  /** MCP servers each run's sandbox runs; empty runs none. */
+  mcpServerIds?: string[];
 }
 
 export interface AutomationTriggerDraft {
@@ -162,6 +164,7 @@ export function automationToFormValues(automation: Automation): InitialAutomatio
     eventType: automation.eventType ?? undefined,
     triggerConfig: automation.triggerConfig ?? undefined,
     providerSelections: automation.providerSelections,
+    mcpServerIds: automation.mcpServerIds,
   };
 }
 
