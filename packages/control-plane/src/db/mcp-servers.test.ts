@@ -577,6 +577,27 @@ describe("McpServerStore", () => {
       expect(results).toHaveLength(2); // global + scoped matched via the second member
     });
 
+    it("narrows to selected ids without widening the repository scope", async () => {
+      const { db } = createFakeD1({ allResults: [sampleRow, remoteRow] });
+      const store = new McpServerStore(db, TEST_ENCRYPTION_KEY);
+      const repositories = [{ repoOwner: "bencered", repoName: "dom" }];
+      // remoteRow is scoped to another repository; selecting it does not bring it in.
+      const results = await store.getForLaunch(repositories, [
+        sampleRow.id,
+        remoteRow.id,
+        "deleted-id",
+      ]);
+      expect(results.map((server) => server.id)).toEqual([sampleRow.id]);
+    });
+
+    it("returns nothing for an empty selection and everything in scope without one", async () => {
+      const { db } = createFakeD1({ allResults: [sampleRow, remoteRow] });
+      const store = new McpServerStore(db, TEST_ENCRYPTION_KEY);
+      const repositories = [{ repoOwner: "carboncopyinc", repoName: "habakkuk" }];
+      expect(await store.getForLaunch(repositories, [])).toEqual([]);
+      expect(await store.getForLaunch(repositories, null)).toHaveLength(2);
+    });
+
     it("returns only unscoped servers for repo-less sessions", async () => {
       const { db } = createFakeD1({ allResults: [sampleRow, remoteRow] });
       const store = new McpServerStore(db, TEST_ENCRYPTION_KEY);

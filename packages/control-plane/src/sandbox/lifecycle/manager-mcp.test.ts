@@ -104,3 +104,107 @@ describe("personal MCP servers at launch", () => {
     });
   });
 });
+
+describe("pinned MCP selection at launch", () => {
+  const servers: McpServerConfig[] = [
+    {
+      id: "docs-id",
+      name: "docs",
+      type: "remote",
+      url: "https://docs.example.com/mcp",
+      enabled: true,
+      authMode: "none",
+    },
+    {
+      id: "tracker-id",
+      name: "tracker",
+      type: "remote",
+      url: "https://tracker.example.com/mcp",
+      enabled: true,
+      authMode: "none",
+    },
+  ];
+
+  async function launch(kind: "spawn" | "restore", mcpSelection: string | null) {
+    const session = createMockSession({ harness: "opencode", mcp_selection: mcpSelection });
+    const sandbox = createMockSandbox({
+      status: kind === "spawn" ? "pending" : "stopped",
+      snapshot_image_id: kind === "restore" ? "saved-image" : null,
+      snapshot_runtime_version: kind === "restore" ? COMPATIBLE_RUNTIME_VERSION : null,
+    });
+    const storage = createMockStorage(session, sandbox);
+    const provider = createMockProvider();
+    const getForLaunch = vi.fn(
+      async (_repositories: unknown, selectedIds?: readonly string[] | null) =>
+        selectedIds ? servers.filter((server) => selectedIds.includes(server.id)) : servers
+    );
+    const recordWarning = vi.fn();
+    const manager = createTestLifecycleManager(
+      provider,
+      storage,
+      storage,
+      createMockBroadcaster(),
+      createMockWebSocketManager(false),
+      createMockAlarmScheduler(),
+      createMockIdGenerator(),
+      createUnmanagedShutdown(),
+      {
+        ...createTestConfig(),
+        mcpServerLookup: { getForLaunch },
+        recordMcpServers: vi.fn(),
+        recordWarning,
+      }
+    );
+
+    await manager.spawnSandbox();
+
+    const launched =
+      kind === "spawn"
+        ? vi.mocked(provider.createSandbox).mock.calls[0][0]
+        : vi.mocked(provider.restoreFromSnapshot!).mock.calls[0][0];
+    return {
+      sent: launched.mcpServers?.map((server) => server.name),
+      selectedIds: getForLaunch.mock.calls[0][1],
+      warnings: recordWarning.mock.calls.filter(([, , target]) => target?.scope === "mcp"),
+    };
+  }
+
+  it.each(["spawn", "restore"] as const)(
+    "runs every server in scope when the session pinned none (%s)",
+    async (kind) => {
+      const result = await launch(kind, null);
+      expect(result.sent).toEqual(["docs", "tracker"]);
+      expect(result.selectedIds).toBeNull();
+      expect(result.warnings).toEqual([]);
+    }
+  );
+
+  it.each(["spawn", "restore"] as const)(
+    "re-applies the pinned selection and warns once about servers it left out (%s)",
+    async (kind) => {
+      const result = await launch(
+        kind,
+        JSON.stringify([
+          { id: "docs-id", name: "docs" },
+          { id: "deleted-id", name: "old-crm" },
+        ])
+      );
+      expect(result.sent).toEqual(["docs"]);
+      expect(result.selectedIds).toEqual(["docs-id", "deleted-id"]);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0][0]).toContain("Selected MCP server old-crm is disabled, deleted");
+    }
+  );
+
+  it("launches no MCP server for an empty selection", async () => {
+    const result = await launch("spawn", "[]");
+    expect(result.sent).toBeUndefined();
+    expect(result.selectedIds).toEqual([]);
+  });
+
+  it("fails closed to no server when the stored pin is unreadable", async () => {
+    const result = await launch("spawn", "not json");
+    expect(result.selectedIds).toEqual([]);
+    expect(result.sent).toBeUndefined();
+  });
+});

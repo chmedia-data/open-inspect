@@ -30,6 +30,11 @@ import { resolveGitHubEnrichmentForRequest } from "../session/identity";
 import { resolveSessionScopedSettings } from "../session/integration-settings-resolution";
 import { resolveManagedSkills, SkillResolutionError } from "../session/skill-resolution";
 import { resolvedPin } from "../session/pinned";
+import {
+  McpSelectionError,
+  PERSONAL_MCP_PERMISSION,
+  resolveSessionMcpSelection,
+} from "../mcp/selection";
 import { createSessionMemorySelector } from "../memory/session-memory-selector-factory";
 import type { Env } from "../types";
 import { resolveSessionProviderAuth } from "../session/provider-account-resolution";
@@ -290,6 +295,24 @@ export async function handleCreateSession(
     environmentId
   );
 
+  // A selection only narrows what the session would load anyway, except that personal servers
+  // act as the owner, so choosing them needs the owner's permission within this request's.
+  let mcpSelection;
+  try {
+    mcpSelection = await resolveSessionMcpSelection(
+      ctx.db,
+      env.REPO_SECRETS_ENCRYPTION_KEY,
+      body.mcpSelection,
+      {
+        repositories: scopeMembers,
+        mayUsePersonal: ctx.authorization?.permissions.includes(PERSONAL_MCP_PERMISSION) ?? false,
+      }
+    );
+  } catch (e) {
+    if (e instanceof McpSelectionError) return json({ error: e.message, code: e.code }, e.status);
+    throw e;
+  }
+
   const sessionId = generateId();
   let providerAuth;
   try {
@@ -362,6 +385,7 @@ export async function handleCreateSession(
     sandboxSettings,
     spawnSource,
     managedSkills: resolvedPin(managedSkillsManifest),
+    mcpSelection: resolvedPin(mcpSelection),
     providerAuth,
   };
 
