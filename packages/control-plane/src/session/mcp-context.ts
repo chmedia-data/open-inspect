@@ -33,6 +33,7 @@ interface LaunchBinding {
 }
 interface MessageContext {
   id: string;
+  source: string;
   admitted_canonical_user_id: string | null;
   mcp_eligible: number;
   mcp_revision: number;
@@ -161,7 +162,7 @@ export class SessionMcpContext {
     return (
       (this.sql
         .exec(
-          "SELECT id, admitted_canonical_user_id, mcp_eligible, mcp_revision, mcp_context, mcp_closed FROM messages WHERE status = 'processing' LIMIT 1"
+          "SELECT id, source, admitted_canonical_user_id, mcp_eligible, mcp_revision, mcp_context, mcp_closed FROM messages WHERE status = 'processing' LIMIT 1"
         )
         .toArray()[0] as MessageContext | undefined) ?? null
     );
@@ -272,8 +273,9 @@ export class SessionMcpContext {
    */
   withheldWarning(messageId: string): string | null {
     const message = this.active();
-    if (message?.id !== messageId || !message.mcp_eligible || !message.admitted_canonical_user_id)
-      return null;
+    if (message?.id !== messageId) return null;
+    if (!message.mcp_eligible || !message.admitted_canonical_user_id)
+      return message.source === "automation" ? this.automationIneligibleWarning() : null;
     const byReason = new Map<PersonalMcpWithheldCode, string[]>();
     for (const entry of this.launch())
       if (entry.withheld)
@@ -299,6 +301,25 @@ export class SessionMcpContext {
     });
     return [...sentences, "Other tools remain available."].join(" ");
   }
+  /**
+   * An automation run selected personal servers its turn may not use: it was triggered by
+   * someone other than the owner, the owner lacks `mcp_connections.use`, or it is a follow-up
+   * carrying outside text. Other bot turns stay silent, as they never selected these servers.
+   */
+  private automationIneligibleWarning(): string | null {
+    const names = this.launch()
+      .filter((entry) => entry.authMode === "user_oauth" && !entry.withheld)
+      .map((entry) => entry.name);
+    if (!names.length) return null;
+    const one = names.length === 1;
+    const list = new Intl.ListFormat("en", { style: "long", type: "conjunction" }).format(names);
+    return [
+      `${one ? "Personal MCP" : "Personal MCP servers"} ${list} ${one ? "isn't" : "aren't"} used on this turn.`,
+      "An automation's personal servers act as its owner, and only on scheduled runs and on manual runs the owner starts while holding the mcp_connections.use permission.",
+      "Other tools remain available.",
+    ].join(" ");
+  }
+
   private async authenticate(request: Request) {
     const before = this.sandboxes.getSandbox();
     const header = request.headers.get("Authorization");
