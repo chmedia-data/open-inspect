@@ -2,6 +2,15 @@
 
 New features, integrations, and notable improvements to Open-Inspect — newest first.
 
+## November 14, 2026
+
+**Unknown models are rejected, and the MCP server can list them.** Creating a session or an
+automation, or sending a prompt, with a `model` that is unknown, not enabled under Settings ›
+Models, or not runnable on the requested harness now fails with a 400 that names the model and lists
+the valid ones. Before, an unknown model silently ran on the default. Omitting `model` still uses
+the default, and existing sessions keep their stored model. The new `list_models` MCP tool
+(`GET /models`, needs `sessions.read`) returns the models a caller can choose.
+
 ## October 31, 2026
 
 **Kimi Coding Plan models.** Kimi K3.1 Pro, K3, Kimi for Coding, and their Highspeed and 256K
