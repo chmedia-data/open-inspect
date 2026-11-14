@@ -5,7 +5,14 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
 import {
+  HARNESS_IDS,
+  getHarnessReasoningConfig,
+  harnessSupportsModel,
+} from "@open-inspect/shared/harnesses";
+import {
   DEFAULT_ENABLED_MODELS,
+  DEFAULT_MODEL,
+  MODEL_OPTIONS,
   isValidModel,
   normalizeModelId,
   type ModelPreferenceChange,
@@ -56,6 +63,51 @@ async function getModelPreferences(
       ? error("Model preferences storage unavailable", 503)
       : json({ enabledModels: DEFAULT_ENABLED_MODELS, revision: 0 });
   }
+}
+
+/**
+ * The catalog as a caller can choose from it: every model with whether this installation has it
+ * enabled and which harnesses run it. Provider credentials are not checked here, so an enabled
+ * model can still fail at run time when its provider is not configured.
+ */
+async function listModels(
+  _request: Request,
+  _env: Env,
+  _params: object,
+  ctx: RequestContext
+): Promise<Response> {
+  let enabledModels: readonly string[];
+  try {
+    enabledModels = await new ModelPreferencesStore(ctx.db).getEnabledModels();
+  } catch (e) {
+    logger.error("Failed to list models", {
+      error: e instanceof Error ? e.message : String(e),
+      request_id: ctx.request_id,
+      trace_id: ctx.trace_id,
+    });
+    return error("Model preferences storage unavailable", 503);
+  }
+  const enabled = new Set(enabledModels);
+  const models = MODEL_OPTIONS.flatMap(({ category, models }) =>
+    models.map(({ id, name, description }) => ({
+      id,
+      name,
+      description,
+      category,
+      enabled: enabled.has(id),
+      harnesses: HARNESS_IDS.filter((harness) => harnessSupportsModel(harness, id)).map(
+        (harness) => {
+          const reasoning = getHarnessReasoningConfig(harness, id);
+          return {
+            harness,
+            reasoningEfforts: reasoning?.efforts ?? [],
+            defaultReasoningEffort: reasoning?.default ?? null,
+          };
+        }
+      ),
+    }))
+  );
+  return json({ defaultModel: DEFAULT_MODEL, models });
 }
 
 async function setModelPreferences(
@@ -146,6 +198,19 @@ modelPreferencesRoutes.get(
     cacheControl: "private, no-store",
   }),
   (c) => dispatch(c, getModelPreferences)
+);
+
+// Read-only, so a token needs only sessions.read. A token limited to automations cannot list
+// models; it can still pass a model, which is validated on save.
+modelPreferencesRoutes.get(
+  "/models",
+  admit({
+    ...GITHUB_USER_OR_SERVICE_ROUTE,
+    authorization: requirePermission("sessions.read"),
+    personalAccessTokens: "accept",
+    cacheControl: "private, no-store",
+  }),
+  (c) => dispatch(c, listModels)
 );
 
 modelPreferencesRoutes.put(
