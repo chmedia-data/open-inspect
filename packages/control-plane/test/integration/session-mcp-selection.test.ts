@@ -181,3 +181,43 @@ describe("creating a session with an MCP selection", () => {
     expect(granted.status).toBe(201);
   });
 });
+
+describe("listing MCP servers with a token", () => {
+  function get(token: string, path: string) {
+    return SELF.fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  }
+
+  it("lists servers with mcp_servers.read and is refused without it", async () => {
+    const reader = await issueToken(["mcp_servers.read"]);
+    const listed = await get(reader, "/mcp-servers");
+    expect(listed.status).toBe(200);
+    const servers = await listed.json<{ id: string }[]>();
+    expect(servers.map((server) => server.id).sort()).toEqual([
+      "srv-docs",
+      "srv-off",
+      "srv-scoped",
+      "srv-tracker",
+      "srv-wiki",
+    ]);
+
+    const unrelated = await issueToken(["sessions.read"]);
+    expect((await get(unrelated, "/mcp-servers")).status).toBe(403);
+  });
+
+  it("reads its owner's connection status only when granted mcp_connections.use", async () => {
+    const granted = await issueToken(["mcp_connections.use"]);
+    const status = await get(granted, "/mcp-connections/status");
+    expect(status.status).toBe(200);
+    const { connections } = await status.json<{
+      connections: { serverId: string; status: string }[];
+    }>();
+    expect(connections).toEqual([
+      expect.objectContaining({ serverId: "srv-tracker", status: "not_connected" }),
+    ]);
+
+    const reader = await issueToken(["mcp_servers.read"]);
+    expect((await get(reader, "/mcp-connections/status")).status).toBe(403);
+    // The browser list, which viewers rely on, still refuses tokens.
+    expect((await get(granted, "/mcp-connections")).status).toBe(403);
+  });
+});

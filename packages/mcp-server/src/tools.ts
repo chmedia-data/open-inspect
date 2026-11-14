@@ -40,8 +40,13 @@ import {
   skillResponseSchema,
   skillSchema,
 } from "@open-inspect/shared/types/skills";
+import {
+  MAX_MCP_SELECTION_SERVERS,
+  type McpPersonalConnection,
+  type McpServerMetadata,
+} from "@open-inspect/shared/types/integrations";
 import { z } from "zod";
-import type { ControlPlaneClient } from "./client";
+import { ControlPlaneError, type ControlPlaneClient } from "./client";
 
 /**
  * Page caps, matching what the control-plane handlers themselves enforce.
@@ -207,6 +212,55 @@ const importRef = z
   .optional()
   .describe("Branch, tag, or commit to read. Defaults to the repository's default branch.");
 
+const mcpServerIds = z
+  .array(z.string().min(1))
+  .max(MAX_MCP_SELECTION_SERVERS)
+  .describe("MCP server ids, as returned by list_mcp_servers");
+
+/**
+ * Every MCP server with the caller's own connection status for personal ones. The status route
+ * needs `mcp_connections.use`; a token without it cannot use personal servers anyway, so a 403
+ * there leaves the status unknown rather than failing the whole listing.
+ */
+async function listMcpServers(client: ControlPlaneClient, repo: string | undefined) {
+  const servers = (await client.get("/mcp-servers", { repo })) as McpServerMetadata[];
+  let connections: McpPersonalConnection[] | null = null;
+  try {
+    connections = (
+      (await client.get("/mcp-connections/status")) as { connections: McpPersonalConnection[] }
+    ).connections;
+  } catch (cause) {
+    if (!(cause instanceof ControlPlaneError) || cause.status !== 403) throw cause;
+  }
+  const status = new Map(connections?.map((c) => [c.serverId, c.status]));
+  return {
+    servers: servers.map((server) => {
+      const authMode = server.authMode ?? "service_credentials";
+      return {
+        id: server.id,
+        name: server.name,
+        type: server.type,
+        enabled: server.enabled,
+        authMode,
+        repoScopes: server.repoScopes ?? null,
+        connectionStatus:
+          authMode !== "user_oauth"
+            ? null
+            : connections === null
+              ? "unknown"
+              : (status.get(server.id) ?? "not_connected"),
+      };
+    }),
+    ...(connections === null
+      ? {
+          note:
+            "Connection status is unknown: the token lacks mcp_connections.use, so it cannot " +
+            "use personal (user_oauth) servers either.",
+        }
+      : {}),
+  };
+}
+
 export const TOOLS: ToolDefinition[] = [
   defineTool({
     name: "list_sessions",
@@ -358,6 +412,14 @@ export const TOOLS: ToolDefinition[] = [
         .min(1)
         .optional()
         .describe("First prompt, sent right after the session is created"),
+      mcp_server_ids: mcpServerIds
+        .optional()
+        .describe(
+          "MCP servers the sandbox runs, as ids from list_mcp_servers. Omitted, it runs every " +
+            "enabled server in the target's scope; an empty list runs none. Each id must be " +
+            "enabled and in scope. Personal (user_oauth) servers act as the token's owner and " +
+            "need mcp_connections.use on the token."
+        ),
     },
     run: async (client, args) => {
       if ((args.repo_owner === undefined) !== (args.repo_name === undefined)) {
@@ -373,6 +435,10 @@ export const TOOLS: ToolDefinition[] = [
         model: args.model,
         reasoningEffort: args.reasoning_effort,
         visibility: args.visibility,
+        mcpSelection:
+          args.mcp_server_ids === undefined
+            ? undefined
+            : { mode: "selected", serverIds: args.mcp_server_ids },
       } satisfies CreateSessionRequest)) as CreateSessionResponse;
       if (args.prompt === undefined) return created;
       const prompted = await client.post(
@@ -418,6 +484,26 @@ export const TOOLS: ToolDefinition[] = [
       "session and its sandbox stay; send_prompt continues it.",
     inputSchema: { session_id: sessionId },
     run: (client, args) => client.post(`/sessions/${encodeURIComponent(args.session_id)}/stop`, {}),
+  }),
+  defineTool({
+    name: "list_mcp_servers",
+    requires: "mcp_servers.read, plus mcp_connections.use for personal connection status",
+    title: "List MCP servers",
+    readOnly: true,
+    description:
+      "List the installation's MCP servers: id, name, whether enabled, authMode, repository " +
+      "scope (null means every repository), and for personal (user_oauth) servers the token " +
+      "owner's connection status. Use to find the ids create_session and create_automation take " +
+      "in mcp_server_ids. A personal server that is not connected is skipped with a warning on " +
+      "each turn; connect it in the web app's settings.",
+    inputSchema: {
+      repo: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Only servers in scope for this owner/name repository"),
+    },
+    run: (client, args) => listMcpServers(client, args.repo),
   }),
   defineTool({
     name: "list_automations",
@@ -611,6 +697,14 @@ export const TOOLS: ToolDefinition[] = [
         .min(1)
         .optional()
         .describe("Reasoning effort, where the selected model takes one"),
+      mcp_server_ids: mcpServerIds
+        .optional()
+        .describe(
+          "MCP servers each run's sandbox runs, as ids from list_mcp_servers. Omitted or empty, " +
+            "runs have no MCP server. Personal (user_oauth) servers act as the automation's " +
+            "owner, need mcp_connections.use on the token, and are refused for team automations " +
+            "and for every trigger but schedule."
+        ),
     },
     run: (client, args) => {
       const triggerType = args.trigger_type;
@@ -646,6 +740,7 @@ export const TOOLS: ToolDefinition[] = [
         harness: args.harness,
         model: args.model,
         reasoningEffort: args.reasoning_effort,
+        mcpServerIds: args.mcp_server_ids,
       } satisfies CreateAutomationRequest);
     },
   }),

@@ -113,7 +113,7 @@ describe("tool surface", () => {
       "trigger_automation",
       "update_skill_from_git",
     ]);
-    expect(tools).toHaveLength(16);
+    expect(tools).toHaveLength(17);
     // Re-import moves the skill's current revision, which is what later
     // sessions load; a client reads this to decide how hard to prompt.
     const hints = Object.fromEntries(
@@ -341,6 +341,19 @@ describe("list_automations", () => {
 });
 
 describe("create_automation", () => {
+  it("forwards the MCP server ids", async () => {
+    const { client, post } = fakeClient({ post: () => ({ automation: { id: "auto_1" } }) });
+
+    await tool("create_automation").run(client, {
+      name: "Nightly sync",
+      instructions: "Run the tests",
+      schedule_cron: "0 9 * * *",
+      mcp_server_ids: ["mcp_1", "mcp_2"],
+    });
+
+    expect(post.mock.calls[0][1]).toMatchObject({ mcpServerIds: ["mcp_1", "mcp_2"] });
+  });
+
   it("camel-cases the body and defaults a schedule's timezone", async () => {
     const { client, post } = fakeClient({ post: () => ({ automation: { id: "auto_1" } }) });
 
@@ -508,7 +521,154 @@ describe("trigger_automation", () => {
   });
 });
 
+describe("list_mcp_servers", () => {
+  const servers = [
+    {
+      id: "mcp_1",
+      name: "linear",
+      type: "remote",
+      enabled: true,
+      authMode: "user_oauth",
+      url: "https://x",
+      hasEnv: false,
+      hasHeaders: false,
+      revision: 1,
+    },
+    {
+      id: "mcp_2",
+      name: "docs",
+      type: "remote",
+      enabled: true,
+      authMode: "none",
+      repoScopes: ["acme/web"],
+      hasEnv: false,
+      hasHeaders: false,
+      revision: 1,
+    },
+    {
+      id: "mcp_3",
+      name: "jira",
+      type: "remote",
+      enabled: false,
+      authMode: "user_oauth",
+      hasEnv: false,
+      hasHeaders: false,
+      revision: 1,
+    },
+  ];
+
+  it("joins the caller's connection status onto personal servers only", async () => {
+    const { client, get } = fakeClient({
+      get: (path) =>
+        path === "/mcp-servers"
+          ? servers
+          : {
+              connections: [
+                {
+                  serverId: "mcp_1",
+                  name: "linear",
+                  enabled: true,
+                  authMode: "user_oauth",
+                  status: "connected",
+                },
+              ],
+            },
+    });
+
+    const result = await tool("list_mcp_servers").run(client, { repo: "acme/web" });
+
+    expect(get).toHaveBeenCalledWith("/mcp-servers", { repo: "acme/web" });
+    expect(result).toEqual({
+      servers: [
+        {
+          id: "mcp_1",
+          name: "linear",
+          type: "remote",
+          enabled: true,
+          authMode: "user_oauth",
+          repoScopes: null,
+          connectionStatus: "connected",
+        },
+        {
+          id: "mcp_2",
+          name: "docs",
+          type: "remote",
+          enabled: true,
+          authMode: "none",
+          repoScopes: ["acme/web"],
+          connectionStatus: null,
+        },
+        {
+          id: "mcp_3",
+          name: "jira",
+          type: "remote",
+          enabled: false,
+          authMode: "user_oauth",
+          repoScopes: null,
+          connectionStatus: "not_connected",
+        },
+      ],
+    });
+  });
+
+  it("reports the status unknown when the token may not use connections", async () => {
+    const { ControlPlaneError } = await import("./client");
+    const { client } = fakeClient({
+      get: (path) => {
+        if (path === "/mcp-servers") return servers.slice(0, 1);
+        throw new ControlPlaneError("forbidden", 403);
+      },
+    });
+
+    const result = (await tool("list_mcp_servers").run(client, {})) as {
+      servers: { connectionStatus: string | null }[];
+      note?: string;
+    };
+
+    expect(result.servers[0].connectionStatus).toBe("unknown");
+    expect(result.note).toContain("mcp_connections.use");
+  });
+
+  it("fails on any other error from the status route", async () => {
+    const { ControlPlaneError } = await import("./client");
+    const { client } = fakeClient({
+      get: (path) => {
+        if (path === "/mcp-servers") return servers;
+        throw new ControlPlaneError("boom", 500);
+      },
+    });
+
+    await expect(tool("list_mcp_servers").run(client, {})).rejects.toThrow("boom");
+  });
+});
+
 describe("create_session", () => {
+  it("pins the MCP selection when ids are given, an empty list included", async () => {
+    const { client, post } = fakeClient({
+      post: () => ({ sessionId: "ses_1", status: "created" }),
+    });
+
+    await tool("create_session").run(client, {
+      repo_owner: "acme",
+      repo_name: "web",
+      mcp_server_ids: [],
+    });
+    await tool("create_session").run(client, {
+      repo_owner: "acme",
+      repo_name: "web",
+      mcp_server_ids: ["mcp_1"],
+    });
+    await tool("create_session").run(client, { repo_owner: "acme", repo_name: "web" });
+
+    expect(
+      post.mock.calls.map(([, body]) => (body as { mcpSelection?: unknown }).mcpSelection)
+    ).toEqual([
+      { mode: "selected", serverIds: [] },
+      { mode: "selected", serverIds: ["mcp_1"] },
+      undefined,
+    ]);
+  });
+
   it("creates a repository session and returns its id", async () => {
     const { client, post } = fakeClient({
       post: () => ({ sessionId: "ses_1", status: "created" }),

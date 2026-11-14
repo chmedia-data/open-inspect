@@ -2,7 +2,14 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { admit, dispatch } from "../routing/admit";
 import type { ControlPlaneHonoEnv } from "../routing/hono-env";
-import { ACTIVE_SELF, SCM_AGNOSTIC_HUMAN_USER_ROUTE, type UserRouteContext } from "./shared";
+import {
+  ACTIVE_SELF,
+  requirePermission,
+  SCM_AGNOSTIC_HUMAN_USER_ROUTE,
+  type RequestContext,
+  type RouteContext,
+  type UserRouteContext,
+} from "./shared";
 import type { Env } from "../types";
 import { McpServerStore } from "../db/mcp-servers";
 import { McpConnectionStore } from "../db/mcp-connections";
@@ -16,7 +23,18 @@ const self = admit({
   authorization: ACTIVE_SELF,
   cacheControl: "private, no-store",
 });
-function services(ctx: UserRouteContext, env: Env) {
+/**
+ * The caller's connection list for personal access tokens, which `self` cannot admit. It requires
+ * `mcp_connections.use`, so a token reads connections only when it may also use them; the browser
+ * list stays on `self` so viewers keep seeing their own.
+ */
+const tokenStatus = admit({
+  ...SCM_AGNOSTIC_HUMAN_USER_ROUTE,
+  authorization: requirePermission("mcp_connections.use"),
+  personalAccessTokens: "accept",
+  cacheControl: "private, no-store",
+});
+function services(ctx: RequestContext, env: Env) {
   const store = new McpConnectionStore(ctx.db, requireTokenEncryptionKey(env));
   return {
     store,
@@ -24,7 +42,12 @@ function services(ctx: UserRouteContext, env: Env) {
     oauth: new McpOAuthService(store),
   };
 }
-async function list(_request: Request, env: Env, _params: object, ctx: UserRouteContext) {
+async function list(
+  _request: Request,
+  env: Env,
+  _params: object,
+  ctx: RouteContext<{ kind: "user" }, "accept">
+) {
   try {
     const { store, registry } = services(ctx, env);
     await store.pruneTransactions(ctx.principal.userId);
@@ -115,6 +138,7 @@ async function disconnect(
 }
 export const mcpConnectionRoutes = new Hono<ControlPlaneHonoEnv>();
 mcpConnectionRoutes.get("/mcp-connections", self, (c) => dispatch(c, list));
+mcpConnectionRoutes.get("/mcp-connections/status", tokenStatus, (c) => dispatch(c, list));
 mcpConnectionRoutes.post("/mcp-connections/oauth/callback", self, (c) => dispatch(c, callback));
 mcpConnectionRoutes.post("/mcp-connections/:serverId/connect", self, (c) => dispatch(c, connect));
 mcpConnectionRoutes.delete("/mcp-connections/:serverId", self, (c) => dispatch(c, disconnect));
