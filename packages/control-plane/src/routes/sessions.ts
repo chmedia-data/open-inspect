@@ -14,6 +14,7 @@ import { sessionAttachmentRoutes } from "./session-attachments";
 import { sessionWsTokenRoutes } from "./session-ws-token";
 import { sessionDiffRoutes } from "./session-diffs";
 import { sessionSkillRoutes } from "./session-skills";
+import { sessionMcpServerRoutes } from "./session-mcp-servers";
 import { sessionExportRoutes } from "./session-export";
 import { sessionScopeRoutes } from "./session-scope";
 
@@ -33,6 +34,7 @@ for (const module of [
   sessionAttachmentRoutes,
   sessionDiffRoutes,
   sessionSkillRoutes,
+  sessionMcpServerRoutes,
   sessionMemoryRoutes,
   sessionChildSpawnRoutes,
   sessionChildRoutes,

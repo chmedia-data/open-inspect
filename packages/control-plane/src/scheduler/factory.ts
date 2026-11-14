@@ -31,6 +31,7 @@ import { createSessionMemorySelector } from "../memory/session-memory-selector-f
 import { initializeSession } from "../session/initialize";
 import { resolveSessionScopedSettings } from "../session/integration-settings-resolution";
 import { resolveManagedSkills } from "../session/skill-resolution";
+import { pinStoredMcpSelection } from "../mcp/selection";
 import {
   AutomationSessionService,
   type AutomationSessionServiceDeps,
@@ -97,6 +98,8 @@ export function createScheduler(
       resolveSessionScopedSettings(db, members, environmentId),
     resolveSkills: (target, selection, userId) =>
       resolveManagedSkills(db, target, selection, userId),
+    pinMcpSelection: (serverIds) =>
+      pinStoredMcpSelection(db, env.REPO_SECRETS_ENCRYPTION_KEY, serverIds),
     teams,
     isAuthorized: (request) => isAutomationExecutionAuthorized(db, request),
     selectMemory: (ctx, request) => createSessionMemorySelector(ctx).select(request),

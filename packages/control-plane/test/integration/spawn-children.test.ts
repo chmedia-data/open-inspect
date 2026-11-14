@@ -3,6 +3,10 @@ import { SELF, env, createExecutionContext } from "cloudflare:test";
 import { runInSessionDO } from "./session-do-access";
 import type { SessionDO } from "../../src/cloudflare/durable-object";
 import { SessionIndexStore } from "../../src/db/session-index";
+import {
+  SessionMcpSelectionStore,
+  type SessionMcpSelectionPin,
+} from "../../src/db/session-mcp-selections";
 import { TeamMembershipStore } from "../../src/db/team-memberships";
 import { TeamRepositoryGrantStore } from "../../src/db/team-repository-grants";
 import { GitHubSourceControlProvider } from "../../src/source-control/providers/github-provider";
@@ -37,6 +41,7 @@ describe("POST /sessions/:parentId/children — spawn child", () => {
     reasoningEffort?: string | null;
     ownerTeamId?: string | null;
     visibility?: "team" | "workspace" | "private";
+    mcpSelection?: SessionMcpSelectionPin;
   }) {
     const parentName = `parent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const store = new SessionIndexStore(env.DB);
@@ -59,6 +64,7 @@ describe("POST /sessions/:parentId/children — spawn child", () => {
       automationRunId: opts?.automationRunId ?? null,
       environmentId: opts?.environmentId ?? null,
       userId: opts?.canonicalUserId ?? null,
+      mcpSelection: opts?.mcpSelection,
       providerAuth: [
         { provider: "openai", authMode: "legacy_scoped_oauth", selectionSource: "legacy_fallback" },
         { provider: "xai", authMode: "legacy_scoped_oauth", selectionSource: "legacy_fallback" },
@@ -552,6 +558,53 @@ describe("POST /sessions/:parentId/children — spawn child", () => {
     const child = await store.get(body.sessionId);
     expect(child?.automationId).toBe("automation-1");
     expect(child?.automationRunId).toBe("run-1");
+  });
+
+  it("pins exactly the parent's MCP selection on the child, in D1 and its Durable Object", async () => {
+    const pin: SessionMcpSelectionPin = {
+      mode: "selected",
+      servers: [{ id: "srv-docs", name: "docs" }],
+    };
+    const { parentName, sandboxToken } = await setupParent({
+      userId: "user-1",
+      canonicalUserId: "canonical-abc123",
+      mcpSelection: pin,
+    });
+
+    const res = await SELF.fetch(`https://test.local/sessions/${parentName}/children`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sandboxToken}` },
+      body: JSON.stringify({ title: "Investigate", prompt: "Investigate the failure" }),
+    });
+
+    expect(res.status).toBe(201);
+    const { sessionId } = await res.json<{ sessionId: string }>();
+    expect(await new SessionMcpSelectionStore(env.DB).getPin(sessionId)).toEqual(pin);
+    const [row] = await queryDO<{ mcp_selection: string | null }>(
+      env.SESSION.get(env.SESSION.idFromName(sessionId)),
+      "SELECT mcp_selection FROM session"
+    );
+    expect(JSON.parse(row!.mcp_selection!)).toEqual(pin.servers);
+  });
+
+  it("runs every server in a child of a parent that predates selections", async () => {
+    const { parentName, sandboxToken } = await setupParent({
+      userId: "user-1",
+      canonicalUserId: "canonical-abc123",
+    });
+    const res = await SELF.fetch(`https://test.local/sessions/${parentName}/children`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sandboxToken}` },
+      body: JSON.stringify({ title: "Investigate", prompt: "Investigate the failure" }),
+    });
+    expect(res.status).toBe(201);
+    const { sessionId } = await res.json<{ sessionId: string }>();
+    expect(await new SessionMcpSelectionStore(env.DB).getPin(sessionId)).toEqual({ mode: "all" });
+    const [row] = await queryDO<{ mcp_selection: string | null }>(
+      env.SESSION.get(env.SESSION.idFromName(sessionId)),
+      "SELECT mcp_selection FROM session"
+    );
+    expect(row!.mcp_selection).toBeNull();
   });
 
   it("persists environment provenance for spawned children", async () => {

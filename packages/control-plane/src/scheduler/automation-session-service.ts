@@ -1,6 +1,12 @@
 import { getValidHarnessOrDefault } from "@open-inspect/shared/harnesses";
 import type { SandboxSettings } from "@open-inspect/shared/types/integrations";
-import type { AutomationRow, AutomationRunRow, AutomationStore } from "../db/automation-store";
+import {
+  parseAutomationMcpServerIds,
+  type AutomationRow,
+  type AutomationRunRow,
+  type AutomationStore,
+} from "../db/automation-store";
+import type { SessionMcpSelectionPin } from "../db/session-mcp-selections";
 import type { TeamStore } from "../db/teams";
 import type { AutomationSessionTarget } from "../automation/session-target";
 import type { AutomationExecutionAuthorizationRequest } from "../automation/authorization-guard";
@@ -27,6 +33,8 @@ export interface AutomationSessionServiceDeps {
     selection: Parameters<typeof resolveManagedSkills>[2],
     userId: string
   ): ReturnType<typeof resolveManagedSkills>;
+  /** Pin the automation's stored MCP server ids, by name, for the run's session. */
+  pinMcpSelection(serverIds: readonly string[]): Promise<SessionMcpSelectionPin>;
   teams: Pick<TeamStore, "getById">;
   isAuthorized(request: AutomationExecutionAuthorizationRequest): Promise<boolean>;
   selectMemory(
@@ -79,6 +87,9 @@ export class AutomationSessionService {
       executionPrincipal.platformUserId
     );
 
+    // Every run loads exactly the servers the automation selects, an empty selection none.
+    const mcpSelection = await this.deps.pinMcpSelection(parseAutomationMcpServerIds(automation));
+
     const scmEnrichment = executionPrincipal.scmEnrichment;
 
     // Re-authorize with admission's requirements, and re-read the team's current policy, as the
@@ -127,6 +138,7 @@ export class AutomationSessionService {
       automationId: automation.id,
       automationRunId: run.id,
       managedSkills: resolvedPin(managedSkillsManifest),
+      mcpSelection: resolvedPin(mcpSelection),
       providerAuth,
     };
 
