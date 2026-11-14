@@ -56,3 +56,46 @@ export interface ManagedMcpExecution {
   servers: string[];
   unavailable: { name: string; code: string }[];
 }
+
+/** Most MCP servers one session or automation may select. */
+export const MAX_MCP_SELECTION_SERVERS = 32;
+
+/** Server ids chosen for a session or an automation: unique, at most {@link MAX_MCP_SELECTION_SERVERS}. */
+export const mcpServerIdsSchema = z
+  .array(z.string().trim().min(1).max(128))
+  .max(MAX_MCP_SELECTION_SERVERS)
+  .refine((ids) => new Set(ids).size === ids.length, { message: "must not contain duplicates" });
+
+/**
+ * Which MCP servers a session's sandbox runs, pinned at creation. `all` is every enabled server in
+ * the session's repository scope (the default); `selected` narrows that to the listed ids and
+ * never widens it. An empty `serverIds` runs no MCP server at all.
+ */
+export const sessionMcpSelectionSchema = z.discriminatedUnion("mode", [
+  z.strictObject({ mode: z.literal("all") }),
+  z.strictObject({ mode: z.literal("selected"), serverIds: mcpServerIdsSchema }),
+]);
+export type SessionMcpSelection = z.infer<typeof sessionMcpSelectionSchema>;
+
+/**
+ * One server of a session's pinned selection as the session view shows it. `available` is false
+ * when the server is deleted, disabled, or out of the session's scope; `authMode` is null once the
+ * server is deleted.
+ */
+export const sessionMcpServerViewSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  authMode: mcpAuthModeSchema.nullable(),
+  available: z.boolean(),
+});
+export type SessionMcpServerView = z.infer<typeof sessionMcpServerViewSchema>;
+
+/**
+ * `GET /sessions/:id/mcp-servers`. For `all`, `servers` lists the enabled servers currently in
+ * the session's scope; for `selected`, the pinned servers, available or not. Never credentials.
+ */
+export const sessionMcpSelectionViewSchema = z.object({
+  mode: z.enum(["all", "selected"]),
+  servers: z.array(sessionMcpServerViewSchema),
+});
+export type SessionMcpSelectionView = z.infer<typeof sessionMcpSelectionViewSchema>;

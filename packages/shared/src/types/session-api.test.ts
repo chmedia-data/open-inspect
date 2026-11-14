@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  createSessionInputSchema,
+  createSessionRequestSchema,
   linearCallbackContextSchema,
   linearCompletionCallbackSchema,
   linearStartCallbackSchema,
@@ -77,6 +79,25 @@ describe("Linear callback channel context", () => {
   it("does not accept an internal owner teamId as callback channel context", () => {
     expect(
       linearCallbackContextSchema.safeParse({ ...legacyContext, teamId: "internal-team-1" }).success
+    ).toBe(false);
+  });
+});
+
+describe("create session MCP selection", () => {
+  it("accepts an omitted, all, or selected MCP selection", () => {
+    expect(createSessionRequestSchema.parse({}).mcpSelection).toBeUndefined();
+    expect(
+      createSessionRequestSchema.parse({ mcpSelection: { mode: "all" } }).mcpSelection
+    ).toEqual({ mode: "all" });
+    expect(
+      createSessionInputSchema.parse({ mcpSelection: { mode: "selected", serverIds: ["s1"] } })
+        .mcpSelection
+    ).toEqual({ mode: "selected", serverIds: ["s1"] });
+  });
+
+  it("refuses a malformed selection", () => {
+    expect(
+      createSessionRequestSchema.safeParse({ mcpSelection: { mode: "selected" } }).success
     ).toBe(false);
   });
 });
