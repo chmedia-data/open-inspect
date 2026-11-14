@@ -21,7 +21,7 @@ import { githubAutofixOriginSchema } from "@open-inspect/shared";
 import {
   DEFAULT_MODEL,
   getDefaultReasoningEffort,
-  isValidModel,
+  getValidModelOrReplacement,
 } from "@open-inspect/shared/models";
 import type { SandboxEvent } from "@open-inspect/shared/types/sandbox-events";
 import { isSessionPromptable } from "@open-inspect/shared/types/session-activity";
@@ -951,12 +951,12 @@ export class SessionMessageQueue {
 
     let messageModel: string | null = null;
     if (data.model) {
-      if (strictSelection || isValidModel(data.model)) {
+      if (strictSelection || getValidModelOrReplacement(data.model)) {
         // Preserve strict overrides so compatibility rejects them below,
         // rather than silently substituting the session's model.
         messageModel = data.model;
       } else {
-        this.log.warn("Invalid message model, ignoring override", { model: data.model });
+        throw new HarnessModelIncompatibleError(`Unknown model "${data.model}".`);
       }
     }
 

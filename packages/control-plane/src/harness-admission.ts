@@ -10,6 +10,7 @@ import {
 } from "@open-inspect/shared/harnesses";
 import {
   getValidModelOrDefault,
+  getValidModelOrReplacement,
   isValidReasoningEffort,
   normalizeModelId,
   resolveEnabledModel,
@@ -49,6 +50,32 @@ export function resolveHarnessInitialization(
   };
 }
 
+/**
+ * Admit a model a caller named explicitly. Unknown and disabled models are rejected with the
+ * models that would have worked, rather than replaced by the default: a silent replacement
+ * runs the work on a model the caller did not choose, and fails later with a credential error.
+ * Retired models still map to their replacement, as everywhere else.
+ */
+export async function resolveRequestedModel(
+  db: SqlDatabase,
+  harness: HarnessId,
+  requested: string,
+  enabledModels?: readonly ValidModel[]
+): Promise<ValidModel> {
+  const model = getValidModelOrReplacement(requested);
+  const enabled = filterModelsForHarness(
+    harness,
+    enabledModels ?? (await new ModelPreferencesStore(db).getEnabledModels())
+  );
+  const hint = ` Valid models for the ${getHarnessLabel(harness)} harness: ${enabled.join(", ") || "none enabled"}.`;
+  if (model === undefined) throw new HarnessAdmissionError(`Unknown model "${requested}".${hint}`);
+  const incompatible = checkHarnessCompatibility(harness, model);
+  if (incompatible) throw new HarnessAdmissionError(`${incompatible.message}${hint}`);
+  if (!enabled.includes(model))
+    throw new HarnessAdmissionError(`Model "${model}" is not enabled for this deployment.${hint}`);
+  return model;
+}
+
 /** Resolve new execution selections without silently replacing an explicit Codex model. */
 export async function resolveHarnessSelection(
   db: SqlDatabase,
@@ -60,7 +87,11 @@ export async function resolveHarnessSelection(
   enabledModels?: readonly ValidModel[]
 ): Promise<{ model: ValidModel; reasoningEffort: ReasoningEffort | null }> {
   if (getHarnessCapabilities(input.harness).selectionPolicy === "legacy_fallback") {
-    const model = getValidModelOrDefault(input.model);
+    // Only an explicit model is checked; an omitted one keeps the installation default.
+    const model =
+      input.model == null
+        ? getValidModelOrDefault(input.model)
+        : await resolveRequestedModel(db, input.harness, input.model, enabledModels);
     const incompatible = checkHarnessCompatibility(input.harness, model);
     if (incompatible) throw new HarnessAdmissionError(incompatible.message);
     return {

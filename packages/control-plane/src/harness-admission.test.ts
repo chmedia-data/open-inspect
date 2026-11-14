@@ -173,3 +173,47 @@ describe("Codex admission", () => {
     expect(getEnabledModels).not.toHaveBeenCalled();
   });
 });
+
+describe("explicitly requested models", () => {
+  beforeEach(() => getEnabledModels.mockReset());
+
+  it("rejects an unknown model on a legacy harness and lists the valid ones", async () => {
+    getEnabledModels.mockResolvedValue([DEFAULT_MODEL]);
+    await expect(
+      resolveHarnessSelection(db, {
+        harness: "opencode",
+        model: "amazon-bedrock/moonshotai.kimi-k2.5",
+      })
+    ).rejects.toThrow(
+      `Unknown model "amazon-bedrock/moonshotai.kimi-k2.5". Valid models for the OpenCode harness: ${DEFAULT_MODEL}`
+    );
+  });
+
+  it("rejects a known model the installation has not enabled", async () => {
+    getEnabledModels.mockResolvedValue([DEFAULT_MODEL]);
+    await expect(
+      resolveHarnessSelection(db, { harness: "opencode", model: "openai/gpt-5.4" })
+    ).rejects.toThrow('Model "openai/gpt-5.4" is not enabled for this deployment.');
+  });
+
+  it("rejects a model the requested harness cannot run", async () => {
+    getEnabledModels.mockResolvedValue([DEFAULT_MODEL, "openai/gpt-5.4"]);
+    await expect(
+      resolveHarnessSelection(db, { harness: "claude", model: "openai/gpt-5.4" })
+    ).rejects.toThrow('Model "openai/gpt-5.4" cannot run on the Claude Agent harness.');
+  });
+
+  it("accepts an enabled model", async () => {
+    getEnabledModels.mockResolvedValue([DEFAULT_MODEL, "openai/gpt-5.4"]);
+    await expect(
+      resolveHarnessSelection(db, { harness: "opencode", model: "openai/gpt-5.4" })
+    ).resolves.toMatchObject({ model: "openai/gpt-5.4" });
+  });
+
+  it("uses the default for an omitted model without reading preferences", async () => {
+    await expect(
+      resolveHarnessSelection(db, { harness: "opencode", model: undefined })
+    ).resolves.toMatchObject({ model: DEFAULT_MODEL });
+    expect(getEnabledModels).not.toHaveBeenCalled();
+  });
+});
