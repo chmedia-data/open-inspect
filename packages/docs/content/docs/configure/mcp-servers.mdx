@@ -110,13 +110,28 @@ API clients make the same per-name edits by sending `keepCredentialKeys` with `P
 
 Edit a server from the list to change any field and click Save Changes; see [Saved credentials](#saved-credentials) for environment variables and headers. Deleting a server cannot be undone.
 
+## Choosing servers per session
+
+Each session pins the servers its sandbox runs when it is created, and keeps them for its whole life, through restores and snapshot restores.
+
+- New session form: the MCP control next to the skill selector defaults to all servers in scope, which is the behaviour sessions have always had. Clear "All servers in scope" to pick specific servers, or none.
+- API and personal access tokens: `POST /sessions` takes `mcpSelection`, either `{ "mode": "all" }` (the default) or `{ "mode": "selected", "serverIds": [...] }` with at most 32 ids. The `create_session` MCP tool takes the same list as `mcp_server_ids`; `list_mcp_servers` lists the ids.
+- A child session inherits its parent's selection.
+- Every selected id must be an enabled server in the session's scope, or creation is refused naming the ids. A selection only narrows the scope; it never adds a server the scope excludes.
+- Selecting a personal server needs `mcp_connections.use`, and a token needs it in its grant too.
+- A selected server that is later disabled, deleted, or taken out of scope is dropped when the sandbox next starts, with an `mcp` warning naming it.
+
+The session sidebar lists the pinned servers and marks those no longer available. `GET /sessions/:id/mcp-servers` returns the same view.
+
+Automations store their own selection, which starts empty; see [Automations](/automations#mcp-servers).
+
 A server cannot be deleted while users have personal connections to it. Turn it off, click **Revoke connections** on its row and confirm, then delete it. Revoking disconnects every user's personal connection to that server; it does not revoke their accounts at the external service. **Revoke connections** appears on every disabled remote server, because connections made under an earlier **Each user's OAuth connection** setting still block deletion after the mode changes. If such a server was changed to Local, the button is hidden: change it back to Remote first, or call `POST /mcp-servers/:id/revoke-connections`.
 
 ## Personal connections
 
 When a server uses **Each user's OAuth connection**, each person connects their own account under Settings › Connections (**Your MCP connections**). Click **Connect** and approve access at the service. **Reconnect** keeps the current connection working until the new approval completes. **Disconnect** stops use through OpenInspect but does not revoke the account at the external service. Connecting requires the web app to be served over HTTPS.
 
-In a session, the server acts as the person whose prompt is running. Only prompts a person sends from the web or Slack can use personal connections, and prompts sent with a personal access token whose grant includes **Use your MCP connections** (`mcp_connections.use`); turns started by automations, GitHub, or Linear cannot. The permission is checked when the prompt is accepted. Revoking the token, or removing `mcp_connections.use` from it, does not stop work already queued or running with it, including its retries and the child sessions it spawns: stop those sessions to end their calls. Before forwarding each call, OpenInspect checks that this person is not suspended and can still read and collaborate in the session. When several people prompt one session, each turn uses its own author's connection. A child session uses the connection only when the parent session's own agent spawned it. The proxy authenticates the sandbox, not the process inside it, so a process left running from an earlier turn can make calls with the active author's connection during that author's turn. Don't use personal connections in a session shared with people or prompts you don't trust.
+In a session, the server acts as the person whose prompt is running. Only prompts a person sends from the web or Slack can use personal connections, prompts sent with a personal access token whose grant includes **Use your MCP connections** (`mcp_connections.use`), and the first turn of a scheduled automation run by its owner (see [Automations](/automations#mcp-servers)); other automation turns, GitHub, and Linear cannot. The token's grant is checked when the prompt is accepted. The person's own role must also hold `mcp_connections.use` on every turn and every call, so removing it from their role stops personal calls at once. Revoking the token, or removing `mcp_connections.use` from it, does not stop work already queued or running with it, including its retries and the child sessions it spawns: stop those sessions to end their calls. Before forwarding each call, OpenInspect checks that this person is not suspended and can still read and collaborate in the session. When several people prompt one session, each turn uses its own author's connection. A child session uses the connection only when the parent session's own agent spawned it. The proxy authenticates the sandbox, not the process inside it, so a process left running from an earlier turn can make calls with the active author's connection during that author's turn. Don't use personal connections in a session shared with people or prompts you don't trust.
 
 Personal servers work only in OpenCode and Claude Agent sessions whose sandbox image is at runtime generation 80 or later. In a Codex session, or on an older image or snapshot, they are left out of the agent's configuration, and each prompt records an `mcp` warning naming them, shown in the session and in Slack completions. Other MCP servers remain available.
 
@@ -167,8 +182,10 @@ See [lifecycle scripts](/configure/lifecycle-scripts) and [prebuilt images](/con
   <Accordion title="A personal server is missing, or the session shows an MCP warning">
     Cause: the session runs on Codex, or on a sandbox image or snapshot older than runtime
     generation 80; you have not connected your account, or your connection needs reconnecting; the
-    server's settings changed after the session's sandbox started; or the turn was started by an
-    automation, GitHub, or Linear rather than by a person on the web or in Slack. Fix: read the
+    server's settings changed after the session's sandbox started; the session's MCP selection does
+    not include the server; your role no longer holds `mcp_connections.use`; or the turn was
+    started by GitHub, Linear, an event-triggered automation, or a continuation of an automation run
+    rather than by a person on the web or in Slack or by a scheduled automation's owner. Fix: read the
     warning, connect or reconnect under Settings › Connections, and prompt from an OpenCode or
     Claude Agent session on a current image. If the server's settings changed, reconnecting is not
     enough on its own: a running session keeps the server definition it started with, so reconnect

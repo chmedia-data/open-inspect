@@ -2,6 +2,18 @@
 
 New features, integrations, and notable improvements to Open-Inspect — newest first.
 
+## November 14, 2026
+
+**Choose the MCP servers each session runs.** New sessions, API and token sessions, and the
+`create_session` MCP tool can pin a subset of the MCP servers in scope, or none; without a choice a
+session still runs every server in scope. The session sidebar shows the pinned servers. Automations
+store their own selection, and scheduled automations can now use their executor's personal MCP
+connections, with an owner lock on editing them. Existing automations start with no MCP servers
+after this change: edit them to choose the servers they need. Personal connections now also need
+`mcp_connections.use` on the person's role at every turn. A new `list_mcp_servers` MCP tool lists
+server ids. Requires D1 migration 0098. See
+[MCP servers](packages/docs/content/docs/configure/mcp-servers.mdx#choosing-servers-per-session).
+
 ## October 31, 2026
 
 **Kimi Coding Plan models.** Kimi K3.1 Pro, K3, Kimi for Coding, and their Highspeed and 256K

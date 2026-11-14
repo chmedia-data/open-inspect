@@ -99,6 +99,11 @@ its turn's eligibility to the child's first prompt.
   `event_trigger_personal_mcp`), and require that the caller is the owner (403).
 - Owner lock (see Decisions). The lock is decided from the stored selection: it applies while any
   stored id currently names a `user_oauth` server.
+- Executor reassignment (`PATCH /automations/:id`) is refused with `automation_owner_locked` while
+  the lock applies, for everyone. Runs act as the executor, so a reassignment would use the new
+  executor's connections on instructions they never chose, and would let an administrator assign the
+  automation to themselves and then edit it. The owner removes the personal servers first. This
+  follows the user's "ownership stays with one person"; it was not an explicit decision.
 - At admission (`AutomationInvocationService.start` and `admitRetry`), `ExecutionPrincipal` gains
   `mcpEligible`, true only when all hold: the selection names a personal server; the source is
   `schedule` or `manual`; the automation is not team-owned; the execution principal is the owner;
@@ -128,8 +133,11 @@ its turn's eligibility to the child's first prompt.
 - `POST /sessions` and the web `/api/sessions` proxy accept `mcpSelection`.
 - `GET /sessions/:id/mcp-servers` returns the pinned selection view.
 - Automation create and update accept `mcpServerIds`.
-- `GET /mcp-servers` and `GET /mcp-connections` accept personal access tokens (read-only), so the
-  MCP server package can list ids and the caller's connection status.
+- `GET /mcp-servers` and `GET /mcp-servers/:id` accept personal access tokens (`mcp_servers.read`).
+  The browser connection list `GET /mcp-connections` is admitted by `ACTIVE_SELF`, which the token
+  admission policy refuses, and viewers (who lack `mcp_connections.use`) rely on it in settings. A
+  new `GET /mcp-connections/status` serves the same list to tokens and requires
+  `mcp_connections.use`, so a token reads connections only when it may also use them.
 - MCP tools: `list_mcp_servers` (read-only), `mcp_server_ids` on `create_session` and
   `create_automation`.
 - Web: an MCP picker on the new-session form (default all) and on the automation form (default none,
@@ -154,86 +162,6 @@ its turn's eligibility to the child's first prompt.
 
 ## Handover (2026-11-14)
 
-Branch `feat/session-mcp-selection` on `chm`, based on `chm/chm` (35fffc8e). Development moves to
-the vulcan host. No PR is open yet.
-
-### Done (committed)
-
-1. `docs:` this proposal.
-2. `feat(shared):` `sessionMcpSelectionSchema`, `mcpServerIdsSchema`, `SessionMcpSelectionView`
-   (`packages/shared/src/types/managed-mcp.ts`), `mcpSelection` on session create, `mcpServerIds` on
-   automation create, update and response (defaults to `[]`), with schema tests.
-3. `feat:` storage. D1 migration `0098_session_mcp_selection.sql`, `SessionMcpSelectionStore`
-   (`db/session-mcp-selections.ts`), the pin written in the session-create batch, the
-   `automations.mcp_server_ids` column, and the DO `session.mcp_selection` column (DO migration 60).
-4. `feat:` launch filter. `McpServerStore.getForLaunch(repositories, selectedIds)`,
-   `SandboxLaunchContext.loadMcpServers(session, repositories)` applied at fresh spawn, restore and
-   snapshot restore, and one `mcp` warning per launch for dropped servers. Session create validates
-   and pins (`mcp/selection.ts`), a child inherits its parent's pin, and an automation run pins its
-   stored ids. Adds `GET /sessions/:id/mcp-servers` (`routes/session-mcp-servers.ts`). Route catalog
-   snapshots were regenerated (see below).
-5. `feat:` the per-turn check. `assertMcpUserAccess` requires `mcp_connections.use` on the live
-   role, on every turn (`prepare`) and every relayed call. Automation turns that cannot use their
-   selected personal servers now get an `mcp` warning instead of silence (`mcp-context.ts`).
-6. `feat:` automations. `isPersonalMcpEligible` (`scheduler/personal-mcp-eligibility.ts`) is decided
-   at admission and on each retry, and the first prompt sends `mcpEligible`. Save-time rules and the
-   owner lock are in `routes/automation-mcp.ts`, wired into create and `PUT`.
-
-Tests added: shared schema tests; unit tests in `db/mcp-servers.test.ts`,
-`sandbox/lifecycle/manager-mcp.test.ts`, `scheduler/launch-services.test.ts`,
-`scheduler/personal-mcp-eligibility.test.ts`, `scheduler/invocation-services.test.ts` and
-`scheduler/session-prompt.test.ts`; integration tests in `session-mcp-selection.test.ts`,
-`automation-mcp-selection.test.ts`, `spawn-children.test.ts` and `managed-mcp-proxy.test.ts`.
-
-Last local run, before the final commit's formatting only: control-plane unit 5763 passed,
-integration 2828 passed, shared 1465 passed.
-
-### In progress
-
-Nothing is half-written. The next step had not started.
-
-### Remains
-
-1. MCP server package (`packages/mcp-server/src/tools.ts`, kept self-contained because
-   `fix/reject-unknown-models` also edits it): `list_mcp_servers` (read-only), `mcp_server_ids` on
-   `create_session` and `create_automation`, updated descriptions (personal servers act as the token
-   owner, need the `mcp_connections.use` grant, schedule automations only), and tool tests.
-   `GET /mcp-servers` (`MCP_READ` in `routes/mcp-servers.ts`) and `GET /mcp-connections` do not
-   accept tokens yet. Add `personalAccessTokens: "accept"` to the list routes (check that the
-   `ACTIVE_SELF` user route admits a token principal), then regenerate the route snapshots.
-2. Web: an MCP picker next to `session-skill-selector.tsx` on the new-session form
-   (`app/(app)/(sidebar)/page.tsx`, `hooks/use-warm-draft-session.ts`, `/api/sessions` proxy passing
-   `mcpSelection`), default all. The same picker on the automation form (`components/automations/`),
-   default none, with personal servers disabled and a reason given for team automations,
-   non-schedule triggers and non-owners, and an owner-lock notice. A sidebar section next to
-   `sidebar/memories-section.tsx` reading `GET /sessions/:id/mcp-servers`. Component and API route
-   tests.
-3. Docs: `packages/docs/content/docs/configure/mcp-servers.mdx` (~line 119 and the troubleshooting
-   entry at ~167-176), the automations docs (selection, "existing automations start empty", the
-   owner lock), `packages/mcp-server/README.md`, and a `CHANGELOG.md` entry naming D1 migration 0098
-   and the behaviour change.
-4. Rebuild for the PR, per the fork convention in the brief. Recreate the branch as
-   `session-mcp-selection` off `chm/mcp-session-tools` by cherry-picking these commits, then
-   regenerate the route snapshots there. Expect small conflicts in `db/mcp-servers.ts`,
-   `shared/src/types/managed-mcp.ts` and `mcp-servers.mdx`, which differ between `chm/chm` and
-   `chm/mcp-session-tools`. Run the suites on that branch and on a local merge into `chm/chm`. Open
-   the PR with base `mcp-session-tools`, and do not merge.
-5. PR description: what changed; behaviour changes (existing automations lose MCP servers; personal
-   servers now need `mcp_connections.use` on every turn for everyone; automation turns that cannot
-   use personal servers now warn); migration notes (D1 0098, DO migration 60); known gaps (no
-   `update_automation` tool, no mid-session change); verification.
-
-### CI and failing checks
-
-- GitHub Actions are disabled on `chmedia-data/open-inspect` (`actions/permissions` reports
-  `enabled: false`), so no PR will get CI. Verification is the local suite output.
-- `npm run typecheck -w @open-inspect/control-plane` fails in
-  `test/integration/mcp-oauth-client-id.test.ts` (TS18048, `server.authRevision` possibly
-  undefined). This branch does not touch that file. It comes from the `mcp-preregistered-oauth`
-  merge on `chm/chm`, and the failure was not re-checked on a clean base.
-- The route catalog snapshot (`hono-route-catalog-conformance.test.ts.snap`) was stale on the base:
-  it lacked the `personalAccessTokens: "accept"` opt-ins on `POST /sessions`,
-  `POST /sessions/:id/stop` and `POST /sessions/:id/prompt`. Regenerating it for the new route fixed
-  those too. Re-check this on the `mcp-session-tools` rebuild.
-- Lint (`eslint`) passed on the files touched up to the per-turn check commit. The automation step
-  was formatted with Prettier but not re-linted.
+Phase 1 is implemented. The remaining step is the rebuild as `session-mcp-selection` stacked on
+`chm/mcp-session-tools` and the PR (base `mcp-session-tools`). The PR description carries the
+verification and known gaps.

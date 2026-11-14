@@ -126,6 +126,7 @@ Each tool's description states the grant it needs, so the assistant can tell you
 | `send_prompt`                 | `POST /sessions/:id/prompt`                        | `sessions.collaborate`                                 |
 | `stop_session`                | `POST /sessions/:id/stop`                          | `sessions.lifecycle`                                   |
 | `list_skills`                 | `GET /skills`                                      | `skills.read`                                          |
+| `list_mcp_servers`            | `GET /mcp-servers` (+ `/mcp-connections/status`)   | `mcp_servers.read` (+ `mcp_connections.use`)           |
 | `import_skill_from_git`       | `POST /skills/import` (+ preview)                  | `skills.read`, `skills.manage`                         |
 | `update_skill_from_git`       | `POST /skills/:id/reimport` (+ …)                  | `skills.read`, `skills.manage`                         |
 
@@ -142,6 +143,11 @@ reads one child run by its id.
 the cursor from a response back to continue. `list_automations` also filters by name (`search`) and
 by target repository (`repo_owner`, `repo_name`, either alone).
 
+`list_mcp_servers` lists the installation's MCP servers with their ids, authentication mode, and
+repository scope, and for personal servers your connection status. The status needs
+`mcp_connections.use`; without it the status reads `unknown`, and the token cannot use personal
+servers either. Pass the ids as `mcp_server_ids` to `create_session` or `create_automation`.
+
 ### Automation writes
 
 - `create_automation` takes a name, instructions, a trigger, and an optional `team_id`, which a
@@ -152,6 +158,10 @@ by target repository (`repo_owner`, `repo_name`, either alone).
     an `event_type` and usually a `trigger_config` of conditions.
   - A `sentry` trigger also needs `sentry_client_secret`.
   - A `webhook` automation returns the key that calls it, shown once.
+  - `mcp_server_ids` chooses the MCP servers every run starts with. Omitted or empty, runs have no
+    MCP server. Personal servers act as you, need `mcp_connections.use` in the grant, and are
+    refused for team automations and for every trigger but `schedule`. Once an automation selects
+    one, only you can edit it.
 
   The automation is created **enabled**, so a schedule starts firing at its next occurrence. No tool
   edits or pauses an automation, so create it with the schedule it should keep, and fix a mistake in
@@ -165,7 +175,8 @@ by target repository (`repo_owner`, `repo_name`, either alone).
 ### Session writes
 
 - `create_session` starts a session as you, on one repository or an environment, and with `prompt`
-  sends its first prompt in the same call.
+  sends its first prompt in the same call. `mcp_server_ids` limits the MCP servers its sandbox runs
+  (an empty list runs none); omitted, it runs every enabled server in scope.
 - `send_prompt` prompts a session you may collaborate on; it queues behind a running prompt.
 - `stop_session` stops the running prompt; the session stays and `send_prompt` continues it.
 
