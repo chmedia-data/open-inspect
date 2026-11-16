@@ -51,6 +51,7 @@ import { requireDockerSandboxNetwork, resolveDockerPortalConfig } from "../sandb
 import { resolveSandboxBackendName } from "../sandbox/provider-name";
 import { createDockerAdmission } from "../sandbox/docker-admission";
 import { dockerSessionListPath, resolveDockerSandboxLimits } from "../sandbox/docker-limits";
+import { DOCKER_REAPER_INTERVAL_MS, reapDockerSandboxes } from "../sandbox/docker-reaper";
 import { createNodeBackgroundTasks, settlesWithin } from "./background-tasks";
 import { openNodeCacheDatabase } from "./cache-database";
 import type { NodeHostSettings } from "./config";
@@ -242,6 +243,24 @@ async function boot(
     portal.server.listen(portalConfig.port, settings.host);
     await once(portal.server, "listening");
   }
+  const sessionIndex = new SessionIndexStore(db);
+  const reaper = dockerLimits
+    ? setInterval(() => {
+        reapDockerSandboxes({
+          transport: dockerTransport,
+          deploymentName: config.DEPLOYMENT_NAME,
+          stoppedRetentionMs: dockerLimits.stoppedRetentionMs,
+          sessionExists: (id) => sessionIndex.exists(id),
+          nowMs: Date.now(),
+        }).then(
+          (removed) => {
+            if (removed.length) log.info("docker.reaped", { container_ids: removed });
+          },
+          (error) => log.warn("docker.reap_failed", { error: String(error) })
+        );
+      }, DOCKER_REAPER_INTERVAL_MS).unref()
+    : undefined;
+  acquire(() => clearInterval(reaper));
 
   const processTasks = createNodeBackgroundTasks(log);
   const host: ControlPlaneHost = { backgroundTasks: () => processTasks };
@@ -319,6 +338,7 @@ async function boot(
     draining = true;
     // Portal upgrades are independent of session sockets and must not hold shutdown open.
     portal?.close();
+    clearInterval(reaper);
     const deadlineMs = Date.now() + settings.shutdownTimeoutMs;
     const remaining = (): number => Math.max(0, deadlineMs - Date.now());
     log.info("node_host.draining", {
