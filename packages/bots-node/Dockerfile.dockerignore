@@ -1,0 +1,13 @@
+# The bots image builds from the repository root; only what it needs enters
+# the build context. BuildKit reads this file in place of the root
+# .dockerignore for packages/bots-node/Dockerfile.
+*
+!package.json
+!package-lock.json
+!packages/shared/
+!packages/github-bot/
+!packages/slack-bot/
+!packages/linear-bot/
+!packages/bots-node/
+packages/**/node_modules/
+packages/**/dist/
