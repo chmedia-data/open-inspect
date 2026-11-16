@@ -30,10 +30,30 @@ import {
   readDockerPortalLabels,
   type DockerPortalConfig,
 } from "../docker-portals";
+import type { DockerAdmission } from "../docker-admission";
+import type { DockerSandboxLimits } from "../docker-limits";
 
 const log = createLogger("docker-provider");
 // Fits inside the lifecycle manager's bounded provider-stop budget.
 const DOCKER_STOP_TIMEOUT_SECONDS = 5;
+
+/**
+ * Every other capability is dropped, notably NET_RAW (packet and ARP forgery
+ * on the shared bridge) and NET_ADMIN. Each one kept was shown necessary in
+ * the sandbox image (docs/DOCKER_SANDBOX_PROVIDER.md): apt runs its fetchers
+ * as `_apt` (SETUID, SETGID) and writes root-only state (DAC_OVERRIDE); npm
+ * and package scripts chown and chmod files they did not create (CHOWN,
+ * FOWNER); KILL lets the runtime end a hook's process group when part of it
+ * runs as another user, such as apt's fetchers.
+ */
+export const DOCKER_SANDBOX_CAPABILITIES = [
+  "CHOWN",
+  "DAC_OVERRIDE",
+  "FOWNER",
+  "KILL",
+  "SETGID",
+  "SETUID",
+] as const;
 
 /**
  * The sandbox reaches the control plane on the Docker network, not at its
@@ -69,6 +89,8 @@ export interface DockerProviderConfig {
   scmProvider: SourceControlProviderName;
   portal: DockerPortalConfig;
   sandboxAccessPasswordSecret: string;
+  limits: DockerSandboxLimits;
+  admission: DockerAdmission;
 }
 
 class DockerApiError extends SandboxProviderError {
@@ -144,6 +166,19 @@ export class DockerSandboxProvider implements SandboxProvider {
       // The runtime fetches the committed URL map before running start.sh.
       EXPECTED_TUNNEL_PORTS: plan.extraTunnelPorts.join(","),
     });
+    return this.config.admission.admit(() =>
+      this.createAndStart(config, name, env, labels, access)
+    );
+  }
+
+  private async createAndStart(
+    config: CreateSandboxConfig,
+    name: string,
+    env: Record<string, string>,
+    labels: Record<string, string>,
+    access: Awaited<ReturnType<DockerSandboxProvider["portalAccess"]>>
+  ): Promise<CreateSandboxResult> {
+    const { limits } = this.config;
     let containerId: string | undefined;
     try {
       const created = await this.call(
@@ -164,6 +199,14 @@ export class DockerSandboxProvider implements SandboxProvider {
             AutoRemove: false,
             RestartPolicy: { Name: "no" },
             LogConfig: { Type: "json-file", Config: { "max-size": "10m", "max-file": "3" } },
+            CapDrop: ["ALL"],
+            CapAdd: [...DOCKER_SANDBOX_CAPABILITIES],
+            SecurityOpt: ["no-new-privileges:true"],
+            Memory: limits.memoryBytes,
+            MemorySwap: limits.memorySwapBytes,
+            NanoCpus: limits.nanoCpus,
+            PidsLimit: limits.pidsLimit,
+            ...(limits.runtime ? { Runtime: limits.runtime } : {}),
           },
         }
       );
@@ -238,7 +281,11 @@ export class DockerSandboxProvider implements SandboxProvider {
       const access = portal
         ? await this.portalAccess(config.sandboxId, portal.token, portal.plan)
         : {};
-      await this.call("POST", `${containerPath(config.providerObjectId)}/start`, [204, 304]);
+      const start = () =>
+        this.call("POST", `${containerPath(config.providerObjectId)}/start`, [204, 304]);
+      // An already running container takes no new slot.
+      if (isRecord(detail.State) && detail.State.Running === true) await start();
+      else await this.config.admission.admit(start);
       return {
         success: true,
         providerObjectId: config.providerObjectId,

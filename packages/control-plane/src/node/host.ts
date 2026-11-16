@@ -25,6 +25,7 @@
  */
 
 import { once } from "node:events";
+import { statfs } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { WebSocketServer } from "ws";
@@ -48,6 +49,8 @@ import { createDockerTransport } from "./docker-transport";
 import { createDockerPortalServer } from "./docker-portal-server";
 import { requireDockerSandboxNetwork, resolveDockerPortalConfig } from "../sandbox/docker-portals";
 import { resolveSandboxBackendName } from "../sandbox/provider-name";
+import { createDockerAdmission } from "../sandbox/docker-admission";
+import { dockerSessionListPath, resolveDockerSandboxLimits } from "../sandbox/docker-limits";
 import { createNodeBackgroundTasks, settlesWithin } from "./background-tasks";
 import { openNodeCacheDatabase } from "./cache-database";
 import type { NodeHostSettings } from "./config";
@@ -192,8 +195,32 @@ async function boot(
     log,
   });
   const dockerTransport = createDockerTransport(config.DOCKER_SOCKET_PATH);
+  const dockerBackend = resolveSandboxBackendName(config.SANDBOX_PROVIDER) === "docker";
+  const dockerLimits = dockerBackend ? resolveDockerSandboxLimits(config) : undefined;
   const platform: Platform = {
     DOCKER_TRANSPORT: dockerTransport,
+    DOCKER_ADMISSION: dockerLimits
+      ? createDockerAdmission({
+          maxRunning: dockerLimits.maxRunning,
+          minFreeDiskPercent: dockerLimits.minFreeDiskPercent,
+          countRunning: async () => {
+            const list = await dockerTransport.request(
+              "GET",
+              dockerSessionListPath(config.DEPLOYMENT_NAME, false)
+            );
+            if (list.status !== 200 || !Array.isArray(list.body)) {
+              throw new Error(`Docker Engine list failed (HTTP ${list.status})`);
+            }
+            return list.body.length;
+          },
+          // The data directory shares the Docker data volume in the documented
+          // deployment, so its free space is what sandbox writes consume.
+          freeDiskPercent: async () => {
+            const stats = await statfs(settings.dataDir);
+            return (stats.bavail / stats.blocks) * 100;
+          },
+        })
+      : undefined,
     DB: db,
     SESSION: createNodeSessionRuntimeDispatch(registry),
     REPOS_CACHE: new SqlCacheStore(cacheDb),
@@ -201,10 +228,7 @@ async function boot(
     JOBS: jobs,
   };
   const env: Env = { ...config, ...platform };
-  const portalConfig =
-    resolveSandboxBackendName(config.SANDBOX_PROVIDER) === "docker"
-      ? resolveDockerPortalConfig(config)
-      : undefined;
+  const portalConfig = dockerBackend ? resolveDockerPortalConfig(config) : undefined;
   const portal = portalConfig
     ? createDockerPortalServer({
         transport: dockerTransport,

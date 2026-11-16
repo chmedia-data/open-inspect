@@ -25,9 +25,10 @@ import { resolveScmProviderFromEnv } from "../source-control";
 import type { Env } from "../types";
 import { DockerSandboxProvider } from "./providers/docker-provider";
 import { requireDockerSandboxNetwork, resolveDockerPortalConfig } from "./docker-portals";
+import { resolveDockerSandboxLimits } from "./docker-limits";
 
 function createDockerProviderFromEnv(env: Env): DockerSandboxProvider {
-  if (!env.DOCKER_TRANSPORT) {
+  if (!env.DOCKER_TRANSPORT || !env.DOCKER_ADMISSION) {
     throw new Error(
       "SANDBOX_PROVIDER=docker requires the Node control-plane host; Cloudflare Workers cannot access the Docker socket"
     );
@@ -61,6 +62,8 @@ function createDockerProviderFromEnv(env: Env): DockerSandboxProvider {
     scmProvider: resolveScmProviderFromEnv(env.SCM_PROVIDER),
     portal: resolveDockerPortalConfig(env),
     sandboxAccessPasswordSecret: env.TOKEN_ENCRYPTION_KEY,
+    limits: resolveDockerSandboxLimits(env),
+    admission: env.DOCKER_ADMISSION,
   });
 }
 

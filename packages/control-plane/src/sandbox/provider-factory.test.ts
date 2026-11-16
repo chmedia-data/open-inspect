@@ -24,6 +24,7 @@ describe("createSandboxProviderFromEnv", () => {
     const env = createEnv({
       SANDBOX_PROVIDER: "docker",
       DOCKER_TRANSPORT: { request: async () => ({ status: 204, body: null }) },
+      DOCKER_ADMISSION: { admit: (start) => start() },
     });
     expect(() => createSandboxProviderFromEnv(env)).toThrow(
       "DOCKER_SANDBOX_IMAGE and DOCKER_SANDBOX_NETWORK"

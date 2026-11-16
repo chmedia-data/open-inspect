@@ -9,6 +9,12 @@ import {
   deriveVncPassword,
 } from "../sandbox-env";
 import { resolveDockerPortalConfig } from "../docker-portals";
+import { resolveDockerSandboxLimits } from "../docker-limits";
+import { SandboxAdmissionRefusedError, type DockerAdmission } from "../docker-admission";
+
+const admit = vi.fn((start: () => Promise<unknown>) => start());
+const admission: DockerAdmission = { admit: (start) => admit(start) as never };
+const limits = resolveDockerSandboxLimits({});
 
 const config: CreateSandboxConfig = {
   sessionId: "session-1",
@@ -95,10 +101,15 @@ describe("DockerSandboxProvider", () => {
       scmProvider: "gitlab",
       portal: resolveDockerPortalConfig({}),
       sandboxAccessPasswordSecret: "secret",
+      limits,
+      admission,
     }
   );
 
-  beforeEach(() => request.mockReset());
+  beforeEach(() => {
+    request.mockReset();
+    admit.mockClear();
+  });
 
   it("does not expose disabled services or accept injected service ports", async () => {
     request.mockResolvedValueOnce({ status: 201, body: { Id: "container-1" } });
@@ -199,8 +210,20 @@ describe("DockerSandboxProvider", () => {
         Init: true,
         AutoRemove: false,
         RestartPolicy: { Name: "no" },
+        CapDrop: ["ALL"],
+        SecurityOpt: ["no-new-privileges:true"],
+        Memory: limits.memoryBytes,
+        MemorySwap: limits.memorySwapBytes,
+        NanoCpus: limits.nanoCpus,
+        PidsLimit: limits.pidsLimit,
       },
     });
+    const hostConfig = body.HostConfig as { CapAdd: string[] };
+    expect(hostConfig.CapAdd).not.toContain("NET_RAW");
+    expect(hostConfig.CapAdd).not.toContain("NET_ADMIN");
+    expect(body.HostConfig).not.toHaveProperty("Runtime");
+    expect(body.HostConfig).not.toHaveProperty("Privileged");
+    expect(admit).toHaveBeenCalledTimes(1);
     expect(body.HostConfig).not.toHaveProperty("Binds");
     expect(body.HostConfig).not.toHaveProperty("PortBindings");
     const env = Object.fromEntries(
@@ -281,6 +304,8 @@ describe("DockerSandboxProvider", () => {
         scmProvider: "github",
         portal: resolveDockerPortalConfig({}),
         sandboxAccessPasswordSecret: "secret",
+        limits,
+        admission,
       }
     );
     request.mockResolvedValueOnce({ status: 201, body: { Id: "container-1" } });
@@ -389,6 +414,37 @@ describe("DockerSandboxProvider", () => {
       undefined,
       undefined
     );
+  });
+
+  it("admits a resume unless the container is already running", async () => {
+    const detail = (running: boolean) => ({
+      status: 200,
+      body: {
+        State: { Running: running },
+        Config: {
+          Labels: {
+            openinspect_framework: "open-inspect",
+            openinspect_deployment: "local",
+            openinspect_session_id: "session-1",
+            openinspect_expected_sandbox_id: "sandbox-1",
+          },
+        },
+      },
+    });
+    admit.mockClear();
+    request.mockResolvedValueOnce(detail(true)).mockResolvedValueOnce({ status: 304, body: null });
+    await provider.resumeSandbox({ ...stopConfig, sandboxId: "sandbox-1" });
+    expect(admit).not.toHaveBeenCalled();
+    request.mockResolvedValueOnce(detail(false)).mockResolvedValueOnce({ status: 204, body: null });
+    await provider.resumeSandbox({ ...stopConfig, sandboxId: "sandbox-1" });
+    expect(admit).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates nothing when admission refuses", async () => {
+    const refusal = new SandboxAdmissionRefusedError("Sandbox host is at capacity");
+    admit.mockRejectedValueOnce(refusal);
+    await expect(provider.createSandbox(config)).rejects.toBe(refusal);
+    expect(request).not.toHaveBeenCalled();
   });
 
   it("requests a fresh spawn only when the resumed container is missing", async () => {
