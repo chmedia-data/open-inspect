@@ -17,7 +17,7 @@ interface WorkerFetch {
   fetch(request: Request, env: never, ctx: ExecutionContext): Response | Promise<Response>;
 }
 
-export interface BotQueue {
+interface BotQueue {
   /** The env binding the bot produces to. */
   binding: string;
   consume(batch: MessageBatch<unknown>, env: never, ctx: ExecutionContext): Promise<void>;

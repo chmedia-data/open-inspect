@@ -238,7 +238,7 @@ function integer(name: string, value: string | undefined, fallback: number): num
  * bindings the control plane calls them through. Unset leaves that bot
  * unbound, as on a deployment without it.
  */
-export const BOT_SERVICE_VARIABLE_NAMES = ["SLACK_BOT_URL", "LINEAR_BOT_URL"] as const;
+const BOT_SERVICE_VARIABLE_NAMES = ["SLACK_BOT_URL", "LINEAR_BOT_URL"] as const;
 
 /** The bot fetchers `source` configures, each sending to its bot's origin. */
 export function readBotServiceFetchers(

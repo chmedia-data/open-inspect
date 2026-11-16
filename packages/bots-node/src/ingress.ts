@@ -31,7 +31,7 @@ type Rejection = { status: 401 | 403 | 408 | 409 | 413 | 503; reason: string };
 export type IngressEnv = Record<string, string | undefined>;
 
 /** A request whose body has been read and authenticated. */
-export interface VerifiedWebhook {
+interface VerifiedWebhook {
   text: string;
   headers: Headers;
   env: IngressEnv;
@@ -85,7 +85,7 @@ const SIGNED_TIMESTAMP_REPLAY_TTL_MS = 2 * SLACK_MAX_SKEW_MS;
 const GITHUB_REPLAY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Comma-separated identities; empty entries are ignored. */
-export function parseIdList(value: string | undefined): Set<string> {
+function parseIdList(value: string | undefined): Set<string> {
   return new Set(
     (value ?? "")
       .split(",")
