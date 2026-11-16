@@ -326,6 +326,7 @@ export async function handleSpawnChild(
     automationId: parentSession?.automationId ?? null,
     automationRunId: parentSession?.automationRunId ?? null,
     managedSkills: inheritedPin(parentId),
+    mcpSelection: inheritedPin(parentId),
     memory: {
       kind: "inherited",
       parentSessionId: parentId,

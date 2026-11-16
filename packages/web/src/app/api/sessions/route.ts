@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       environmentId: body.environmentId,
       repositories: body.repositories,
       skillSelection: body.skillSelection,
+      mcpSelection: body.mcpSelection,
       includePersonalMemories: body.includePersonalMemories,
       providerSelections: body.providerSelections,
       teamId: body.teamId,

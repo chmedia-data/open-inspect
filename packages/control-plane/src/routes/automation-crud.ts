@@ -35,6 +35,7 @@ import {
 import { isValidModel, normalizeModelId } from "@open-inspect/shared/models";
 import {
   AutomationStore,
+  parseAutomationMcpServerIds,
   parseAutomationTriggerFields,
   type AutomationRow,
   type AutomationRepositoryInsert,
@@ -98,6 +99,11 @@ import {
 import { isAutomationExecutionAuthorized } from "../automation/authorization-guard";
 import { authorizeSessionTarget } from "./session-target-authorization";
 import { authorizeTeamRepositories } from "./workspace-repository-authorization";
+import {
+  automationOwnerLock,
+  automationTargetRepositories,
+  validateAutomationMcpSelection,
+} from "./automation-mcp";
 
 const logger = createLogger("router:automations");
 
@@ -345,6 +351,24 @@ async function handleCreateAutomation(
     throw cause;
   }
 
+  // New automations select no MCP server unless asked: each run loads exactly its selection.
+  const mcpServerIds = body.mcpServerIds ?? [];
+  const mcpSelectionError = await validateAutomationMcpSelection(ctx, env, {
+    serverIds: mcpServerIds,
+    repositories: await automationTargetRepositories(
+      ctx.db,
+      newRepositories.map((repository) => ({
+        repoOwner: repository.repo_owner,
+        repoName: repository.repo_name,
+      })),
+      requestedEnvironmentIds
+    ),
+    triggerType,
+    ownerTeamId,
+    ownerUserId: resolvedUserId,
+  });
+  if (mcpSelectionError) return mcpSelectionError;
+
   // Compute next run (only for schedule triggers)
   const nextRunAt = isSchedule
     ? (body.scheduleOnceAt ?? nextCronOccurrence(body.scheduleCron!, body.scheduleTz!).getTime())
@@ -389,6 +413,7 @@ async function handleCreateAutomation(
     next_run_at: nextRunAt,
     consecutive_failures: 0,
     max_retries: body.maxRetries ?? 0,
+    mcp_server_ids: JSON.stringify(mcpServerIds),
     created_by: enforced.participantUserId,
     user_id: resolvedUserId,
     created_at: now,
@@ -477,6 +502,8 @@ async function handleUpdateAutomation(
   const providerAuthStore = new AutomationModelProviderAuthStore(db);
   const admission = admittedAutomation(ctx);
   const { automation: existing } = admission;
+  const ownerLock = await automationOwnerLock(ctx, env, existing);
+  if (ownerLock) return ownerLock;
 
   const rawBody = await parseJsonBody(request);
   if (rawBody instanceof Response) return rawBody;
@@ -757,6 +784,37 @@ async function handleUpdateAutomation(
         409
       );
     }
+  }
+
+  if (body.mcpServerIds !== undefined) {
+    const finalRepositories =
+      replacementRepositories ??
+      (await store.getRepositoriesForAutomation(id)).map((repository) => ({
+        repo_owner: repository.repo_owner,
+        repo_name: repository.repo_name,
+      }));
+    const finalEnvironmentIds =
+      replacementEnvironmentIds ??
+      (await store.getEnvironmentsForAutomation(id)).map(
+        (environment) => environment.environment_id
+      );
+    const mcpSelectionError = await validateAutomationMcpSelection(ctx, env, {
+      serverIds: body.mcpServerIds,
+      storedIds: parseAutomationMcpServerIds(existing),
+      repositories: await automationTargetRepositories(
+        ctx.db,
+        finalRepositories.map((repository) => ({
+          repoOwner: repository.repo_owner,
+          repoName: repository.repo_name,
+        })),
+        finalEnvironmentIds
+      ),
+      triggerType: existingTriggerType,
+      ownerTeamId: existing.owner_team_id,
+      ownerUserId: existing.user_id,
+    });
+    if (mcpSelectionError) return mcpSelectionError;
+    updateFields.mcp_server_ids = JSON.stringify(body.mcpServerIds);
   }
 
   // Update event type — only for non-schedule types

@@ -71,6 +71,14 @@ const initRequestSchema = z.object({
    * SandboxSettings later, so the shape is validated at the use site instead.
    */
   sandboxSettings: z.unknown().optional(),
+  /**
+   * The MCP servers pinned at creation (session/initialize.ts resolves a child's from its
+   * parent). Null or absent runs every server in the session's scope.
+   */
+  mcpSelection: z
+    .array(z.object({ id: z.string().min(1), name: z.string() }))
+    .nullable()
+    .optional(),
 });
 
 type InitRequest = z.infer<typeof initRequestSchema>;
@@ -206,6 +214,7 @@ export class SessionInitHandler {
           : null,
         maxCostUsd: normalizedSandboxSettings?.maxSessionCostUsd ?? null,
         environmentId: body.environmentId ?? null,
+        mcpSelection: body.mcpSelection ? JSON.stringify(body.mcpSelection) : null,
         createdAt: now,
         updatedAt: now,
       });

@@ -45,6 +45,11 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/browser-api-fetch", () => ({ browserApiFetch: vi.fn() }));
 vi.mock("@/lib/automation-cache", () => ({ invalidateAutomationCache: vi.fn() }));
+vi.mock("@/hooks/use-mcp-servers", () => ({
+  useMcpServers: () => ({ servers: [], loading: false }),
+  useMcpConnectionStatus: () => new Map(),
+}));
+vi.mock("@/lib/auth-session", () => ({ useAuthSession: () => ({ data: null }) }));
 vi.mock("@/components/automations/webhook-config", () => ({
   WebhookConfig: () => <div>Webhook configuration</div>,
 }));

@@ -27,6 +27,7 @@ import type { DiffSelection } from "@/lib/session-diffs";
 import { deriveSessionDiffView } from "@/lib/session-diffs";
 import { DiffRetryNotice } from "@/components/diff-retry-notice";
 import { ManagedSkillsSection } from "./sidebar/managed-skills-section";
+import { McpServersSection } from "./sidebar/mcp-servers-section";
 import { MemoriesSection } from "./sidebar/memories-section";
 import { BudgetSection } from "./sidebar/budget-section";
 import { DetailsSection } from "./sidebar/details-section";
@@ -352,6 +353,7 @@ export function SessionRightSidebarContent({
             )}
             <ManagedSkillsSection sessionId={sessionState.id} />
             <MemoriesSection sessionId={sessionState.id} />
+            <McpServersSection sessionId={sessionState.id} />
             {(!presenceSynced || participants.length > 0) && (
               <DetailsSection title="Participants">
                 <ParticipantsSection participants={participants} presenceSynced={presenceSynced} />

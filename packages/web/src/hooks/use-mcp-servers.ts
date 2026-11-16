@@ -1,11 +1,14 @@
 import useSWR from "swr";
 import { useAuthSession } from "@/lib/auth-session";
 import { browserApiFetch } from "@/lib/browser-api-fetch";
-import type {
-  CreateMcpServerRequest,
-  McpServerMetadata,
-  UpdateMcpServerRequest,
+import {
+  sessionMcpSelectionViewSchema,
+  type CreateMcpServerRequest,
+  type McpPersonalConnection,
+  type McpServerMetadata,
+  type UpdateMcpServerRequest,
 } from "@open-inspect/shared/types/integrations";
+import { browserApiJson } from "@/lib/browser-api-json";
 
 const MCP_SERVERS_KEY = "/api/mcp-servers";
 
@@ -30,6 +33,24 @@ export function useMcpServers() {
     loading: isLoading,
     mutate,
   };
+}
+
+/** The caller's own connection status per personal server, keyed by server id. */
+export function useMcpConnectionStatus() {
+  const { data: session } = useAuthSession();
+  const { data } = useSWR<{ connections: McpPersonalConnection[] }>(
+    session ? "/api/mcp-connections" : null
+  );
+  return new Map(data?.connections.map((connection) => [connection.serverId, connection.status]));
+}
+
+/** The MCP servers a session pinned at creation, as `GET /sessions/:id/mcp-servers` reports them. */
+export function useSessionMcpServers(sessionId: string) {
+  const { data, isLoading, error } = useSWR(
+    `/api/sessions/${encodeURIComponent(sessionId)}/mcp-servers` as const,
+    (path) => browserApiJson(path, sessionMcpSelectionViewSchema, "MCP server request failed")
+  );
+  return { selection: data, loading: isLoading, error };
 }
 
 export async function createMcpServer(config: CreateMcpServerRequest): Promise<McpServerMetadata> {

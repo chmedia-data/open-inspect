@@ -41,6 +41,9 @@ import { SessionTargetPicker } from "@/components/session-target-picker";
 import { ModelReasoningSelector } from "@/components/model-reasoning-selector";
 import { PaperclipIcon, SendIcon } from "@/components/ui/icons";
 import { SessionSkillSelector } from "@/components/session-skill-selector";
+import { McpServerPopover, mcpPickerServers } from "@/components/mcp-server-picker";
+import { useMcpConnectionStatus, useMcpServers } from "@/hooks/use-mcp-servers";
+import type { McpServerMetadata } from "@open-inspect/shared/types/integrations";
 import { PromptSkillTextarea } from "@/components/prompt-skill-autocomplete";
 import type { SessionSkillSelection } from "@open-inspect/shared/types/skills";
 import {
@@ -166,12 +169,24 @@ export default function Home() {
   const { prompt, setPrompt, clearSubmittedPrompt } = usePromptDraft(NEW_SESSION_PROMPT_DRAFT_ID);
   const [warmRequested, setWarmRequested] = useState(false);
   const [skillSelection, setSkillSelection] = useState<SessionSkillSelection>({ mode: "all" });
+  // Null runs every server in scope, today's default; a list pins exactly those.
+  const [mcpServerIds, setMcpServerIds] = useState<string[] | null>(null);
+  const { servers: mcpServers } = useMcpServers();
+  const mcpConnectionStatus = useMcpConnectionStatus();
   const providerAccounts = useProviderAccounts();
   const sessionAttachments = useSessionAttachments();
   const models = useEnabledModels();
   const preferences = useLaunchPreferences({ models, providerAccounts });
   const { selectedModel, reasoningEffort, harness, providerSelections } = preferences;
   const targetRequestFields = buildRequestFields();
+  const targetRepositories = !targetRequestFields
+    ? []
+    : "repositories" in targetRequestFields
+      ? targetRequestFields.repositories.map((repo) => `${repo.repoOwner}/${repo.repoName}`)
+      : "repoOwner" in targetRequestFields && targetRequestFields.repoOwner
+        ? [`${targetRequestFields.repoOwner}/${targetRequestFields.repoName}`]
+        : [];
+  const pickableMcpServers = mcpPickerServers(mcpServers, targetRepositories, mcpServerIds ?? []);
   const currentSkillPreviewTarget = session ? skillPreviewTarget(targetRequestFields) : null;
   // Fetch the preview for the anticipated target so it loads with the picker's catalogs, but
   // show it only once the target is confirmed.
@@ -194,6 +209,8 @@ export default function Home() {
           model: selectedModel,
           reasoningEffort,
           skillSelection,
+          mcpSelection:
+            mcpServerIds === null ? undefined : { mode: "selected", serverIds: mcpServerIds },
           providerSelections,
           teamId,
           visibility,
@@ -323,6 +340,15 @@ export default function Home() {
       modelOptions={preferences.modelOptions}
       skillSelection={skillSelection}
       setSkillSelection={setSkillSelection}
+      mcp={{
+        servers: pickableMcpServers,
+        connectionStatus: mcpConnectionStatus,
+        value: mcpServerIds,
+        onChange: setMcpServerIds,
+        personalDisabledReason: hasPermission("mcp_connections.use")
+          ? null
+          : "Personal servers need the mcp_connections.use permission.",
+      }}
       skillPreviewTarget={currentSkillPreviewTarget}
       skillPreview={skillPreview}
       skillPreviewLoading={skillPreviewLoading}
@@ -360,6 +386,7 @@ function HomeContent({
   modelOptions,
   skillSelection,
   setSkillSelection,
+  mcp,
   skillPreviewTarget,
   skillPreview,
   skillPreviewLoading,
@@ -408,6 +435,13 @@ function HomeContent({
   modelOptions: ModelCategory[];
   skillSelection: SessionSkillSelection;
   setSkillSelection: (value: SessionSkillSelection) => void;
+  mcp: {
+    servers: McpServerMetadata[];
+    connectionStatus: ReturnType<typeof useMcpConnectionStatus>;
+    value: string[] | null;
+    onChange: (value: string[] | null) => void;
+    personalDisabledReason: string | null;
+  };
   skillPreviewTarget: Omit<SkillResolutionPreviewInput, "selection"> | null;
   skillPreview: SkillResolutionPreviewResponse | null;
   skillPreviewLoading: boolean;
@@ -589,6 +623,8 @@ function HomeContent({
                       previewLoading={skillPreviewLoading}
                       disabled={creating}
                     />
+
+                    <McpServerPopover {...mcp} disabled={creating} />
 
                     {selectedProvider && (
                       <ProviderAuthControls

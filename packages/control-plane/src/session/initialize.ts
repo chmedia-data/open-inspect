@@ -11,6 +11,11 @@ import {
   type SandboxSettings,
 } from "@open-inspect/shared/types/integrations";
 import { SessionIndexStore } from "../db/session-index";
+import {
+  ALL_MCP_SERVERS,
+  SessionMcpSelectionStore,
+  type SessionMcpSelectionPin,
+} from "../db/session-mcp-selections";
 import { SessionInternalPaths } from "./contracts";
 import { createSessionRuntimeClient } from "./runtime-client";
 import { createLogger } from "../logger";
@@ -89,6 +94,8 @@ export interface SessionInitInput {
   memory: SessionMemoryPin;
   /** Managed skills, resolved for a root session or copied from the parent. */
   managedSkills: Pinned<SessionSkillManifestInput>;
+  /** MCP servers the sandbox runs, resolved for a root session or copied from the parent. */
+  mcpSelection: Pinned<SessionMcpSelectionPin>;
   /** Complete, immutable provider routing snapshot resolved by the caller. */
   providerAuth: SessionModelProviderAuthInput[];
 }
@@ -169,6 +176,14 @@ export async function initializeSession(
     });
   }
 
+  // A child runs exactly its parent's pinned servers. The pin is immutable, so reading it before
+  // the batch cannot race a change; a parent that predates selections pinned every server.
+  const mcpSelection =
+    input.mcpSelection.kind === "resolved"
+      ? input.mcpSelection.value
+      : ((await new SessionMcpSelectionStore(ctx.db).getPin(input.mcpSelection.parentSessionId)) ??
+        ALL_MCP_SERVERS);
+
   // Step 1: D1 index (must succeed before DO init starts sandbox warming)
   const sessionStore = new SessionIndexStore(ctx.db);
   if (input.visibility === "private" && !input.platformUserId) {
@@ -207,6 +222,7 @@ export async function initializeSession(
     updatedAt: now,
     memory: input.memory,
     managedSkills: input.managedSkills,
+    mcpSelection,
     providerAuth: input.providerAuth,
   });
 
@@ -244,6 +260,7 @@ export async function initializeSession(
           parentSessionId: input.parentSessionId,
           spawnSource: input.spawnSource,
           spawnDepth: input.spawnDepth,
+          mcpSelection: mcpSelection.mode === "selected" ? mcpSelection.servers : null,
         }),
       }
     );

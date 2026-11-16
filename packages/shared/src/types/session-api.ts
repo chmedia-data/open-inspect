@@ -2,6 +2,7 @@ import { harnessIdSchema } from "../harnesses";
 import { generatedFileDetailsSchema } from "../generated-files";
 import { z } from "zod";
 import { sessionSkillSelectionSchema } from "./skills";
+import { sessionMcpSelectionSchema } from "./managed-mcp";
 import { artifactTypeSchema, type AgentResponse, type StoredFileArtifactType } from "./artifacts";
 import { sessionRepositoriesInputSchema } from "./repositories";
 import type { EventResponse } from "./sandbox-events";
@@ -262,6 +263,11 @@ const createSessionRequestBaseSchema = z.object({
   /** Managed skills are resolved and pinned when the session is created. */
   skillSelection: sessionSkillSelectionSchema.optional(),
   includePersonalMemories: z.boolean().optional(),
+  /**
+   * MCP servers the sandbox runs, pinned when the session is created. Omission means every enabled
+   * server in the session's scope.
+   */
+  mcpSelection: sessionMcpSelectionSchema.optional(),
   /** Explicit account/API-key choices. Omission resolves provider policy. */
   providerSelections: modelProviderSelectionsSchema.optional(),
 });

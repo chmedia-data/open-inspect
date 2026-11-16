@@ -171,6 +171,11 @@ function invocationHarness() {
       resolveProviderAuth: vi.fn().mockResolvedValue({ providerAuth: [] }),
     },
     attribution: { resolve: vi.fn().mockResolvedValue(null) },
+    personalMcp: {
+      isEligible: vi
+        .fn<AutomationInvocationServiceDeps["personalMcp"]["isEligible"]>()
+        .mockResolvedValue(false),
+    },
     launcher: {
       launch: vi
         .fn<AutomationInvocationServiceDeps["launcher"]["launch"]>()
@@ -228,6 +233,27 @@ describe("AutomationInvocationService", () => {
     ].map((fn) => fn.mock.invocationCallOrder[0]);
     expect(order.every((call) => call !== undefined)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("decides personal MCP eligibility at admission and hands it to the launch", async () => {
+    const { deps, service } = invocationHarness();
+    deps.personalMcp.isEligible.mockResolvedValue(true);
+    await service.start({ automation, source: "schedule", actorKind: "system" });
+    expect(deps.personalMcp.isEligible).toHaveBeenCalledWith(
+      expect.objectContaining({ automation, source: "schedule" })
+    );
+    const [, , launch] = deps.launcher.launch.mock.calls[0];
+    expect(launch.executionPrincipal.mcpEligible).toBe(true);
+  });
+
+  it("runs without personal servers when eligibility cannot be decided", async () => {
+    const { deps, service } = invocationHarness();
+    deps.personalMcp.isEligible.mockRejectedValue(new Error("registry unavailable"));
+    await expect(
+      service.start({ automation, source: "manual", actorKind: "person" })
+    ).resolves.toMatchObject({ outcome: "started", launched: 1 });
+    const [, , launch] = deps.launcher.launch.mock.calls[0];
+    expect(launch.executionPrincipal.mcpEligible).toBe(false);
   });
 
   it("leaves a cron slot due when grants change before guarded insertion", async () => {
@@ -369,6 +395,17 @@ function recoveryHarness() {
 }
 
 describe("AutomationInvocationService retries", () => {
+  it("re-decides personal MCP eligibility for each retry as a scheduled firing", async () => {
+    const { deps, service } = invocationHarness();
+    deps.personalMcp.isEligible.mockResolvedValueOnce(false);
+    expect(await service.retryDue(500)).toBe(1);
+    expect(deps.personalMcp.isEligible).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "schedule", automation })
+    );
+    const [, , launch] = deps.launcher.launch.mock.calls[0];
+    expect(launch.executionPrincipal.mcpEligible).toBe(false);
+  });
+
   it("spends a claimed attempt after admission denial and records failure only after the claim", async () => {
     const { deps, service } = invocationHarness();
     deps.isAuthorized.mockResolvedValue(false);

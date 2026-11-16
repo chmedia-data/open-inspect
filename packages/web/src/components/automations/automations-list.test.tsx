@@ -58,6 +58,7 @@ function makeAutomation(overrides: Partial<AutomationListItem> = {}): Automation
     repositories: [{ repoOwner: "acme", repoName: "web-app", repoId: 1, baseBranch: "main" }],
     environmentIds: [],
     providerSelections: {},
+    mcpServerIds: [],
     recentExecutions: [],
     capabilities: { canRead: true, canManage: true, canTrigger: true },
     ...overrides,

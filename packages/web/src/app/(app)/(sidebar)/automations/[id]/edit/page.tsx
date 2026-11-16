@@ -127,6 +127,7 @@ export default function EditAutomationPage({ params }: { params: Promise<{ id: s
           <AutomationForm
             mode="edit"
             initialValues={automationToFormValues(automation)}
+            ownerUserId={automation.userId}
             onSubmit={handleSubmit}
             submitting={submitting}
           />

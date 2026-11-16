@@ -12,7 +12,13 @@ import type { Env } from "../types";
 
 export type SchedulerPromptRequest = Pick<
   EnqueuePromptRequest,
-  "content" | "authorId" | "canonicalUserId" | "source" | "scmEnrichment" | "clientRequestId"
+  | "content"
+  | "authorId"
+  | "canonicalUserId"
+  | "source"
+  | "scmEnrichment"
+  | "clientRequestId"
+  | "mcpEligible"
 > & {
   callbackContext?: AutomationCallbackContext | SlackCallbackContext;
 };
@@ -115,6 +121,8 @@ export async function enqueueAutomationFirstPrompt(
       source: "automation",
       callbackContext,
       clientRequestId: firstPromptRequestId(runId),
+      // Only the first prompt acts as the owner; follow-ups carry outside text and never do.
+      ...(executionPrincipal.mcpEligible ? { mcpEligible: true } : {}),
     },
     { trace_id: `automation:${automation.id}`, request_id: runId }
   );

@@ -16,6 +16,7 @@ import {
   hydrateAutomationResponse,
 } from "./automation-shared";
 import { validateAutomationExecutor, validateAutomationTeam } from "./automation-validation";
+import { automationExecutorLock } from "./automation-mcp";
 
 const executorBodySchema = z.strictObject({
   userId: z.string().refine(isCanonicalUserId, "Invalid canonical user ID"),
@@ -53,7 +54,7 @@ async function validateExecutorCandidate(
 
 async function changeExecutor(
   request: Request,
-  _env: Env,
+  env: Env,
   params: { id: string },
   ctx: RequestContext
 ): Promise<Response> {
@@ -73,6 +74,8 @@ async function changeExecutor(
   if (automation.user_id === body.userId) {
     return json({ automation: await hydrateAutomationResponse(ctx, automation, viewer) });
   }
+  const locked = await automationExecutorLock(ctx, env, automation);
+  if (locked) return locked;
   const store = new AutomationStore(ctx.db);
   const results = await ctx.db.batch([
     store.bindExecutorChange(automation, body.userId, viewer.userId),

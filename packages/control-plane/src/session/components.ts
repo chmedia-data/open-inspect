@@ -82,7 +82,7 @@ import { SessionAttachmentRepository } from "./session-attachment-repository";
 import { ArtifactRepository } from "./artifact-repository";
 import { EventRepository } from "./event-repository";
 import { UsageRepository } from "./usage-repository";
-import { recordSessionWarning } from "./session-warnings";
+import { recordSessionWarning, type SessionWarningTarget } from "./session-warnings";
 import { MessageRepository } from "./message-repository";
 import { ParticipantRepository } from "./participant-repository";
 import { WsClientMappingRepository } from "./ws-client-mapping-repository";
@@ -518,8 +518,8 @@ export function createSessionRuntime(platform: SessionPlatform, env: Env): Sessi
     lifecycleSockets,
     alarmScheduler,
     backgroundTasks,
-    recordWarning: (message, eventId) =>
-      recordSessionWarning(eventRepository, messenger, message, eventId),
+    recordWarning: (message, eventId, target) =>
+      recordSessionWarning(eventRepository, messenger, message, eventId, target),
     resumeQueuedWork: () => messageQueue.processMessageQueue(),
   });
   const executionStop: ExecutionStopCoordinator = new ExecutionStopCoordinator(
@@ -1123,7 +1123,7 @@ export function createSessionRuntime(platform: SessionPlatform, env: Env): Sessi
 
 interface LifecycleManagerDeps {
   recordMcpServers: NonNullable<SandboxLifecycleConfig["recordMcpServers"]>;
-  recordWarning: (message: string, eventId: string) => void;
+  recordWarning: (message: string, eventId: string, target?: SessionWarningTarget) => void;
   resumeQueuedWork: () => Promise<void>;
   shutdown: SandboxShutdownLifecycle;
   access: SandboxAccess;
@@ -1171,7 +1171,7 @@ function createLifecycleManager(deps: LifecycleManagerDeps): SandboxLifecycleMan
 
   const mcpStore = new McpServerStore(db, repoSecretsEncryptionKey);
   const mcpServerLookup: McpServerLookup = {
-    getForLaunch: (repositories) => mcpStore.getForLaunch(repositories),
+    getForLaunch: (repositories, selectedIds) => mcpStore.getForLaunch(repositories, selectedIds),
   };
 
   // Session-scoped gate: resolved from the primary member (the scalar mirror

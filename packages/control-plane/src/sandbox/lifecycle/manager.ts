@@ -44,8 +44,10 @@ import {
   type CreateSandboxConfig,
   type CreateSandboxResult,
   type SandboxLifetime,
+  type SessionRepositoryInfo,
   type StopConfig,
 } from "../provider";
+import type { SessionWarningTarget } from "../../session/session-warnings";
 import {
   evaluateCircuitBreaker,
   evaluateSpawnDecision,
@@ -369,7 +371,7 @@ interface AlarmContext extends WatchdogContext {
 export interface SandboxLifecycleConfig extends AlarmPolicyConfig, SandboxLaunchConfig {
   inactivity: InactivityPolicyConfig;
   /** Persist a user-visible lifecycle warning in the session event stream. */
-  recordWarning?: (message: string, eventId: string) => void;
+  recordWarning?: (message: string, eventId: string, target?: SessionWarningTarget) => void;
   /** Pump the message queue once a deferred connect-timeout re-drive may proceed. */
   resumeQueuedWork?: () => Promise<void>;
   circuitBreaker: CircuitBreakerConfig;
@@ -778,6 +780,38 @@ export class SandboxLifecycleManager
   }
 
   /**
+   * Loads the MCP servers this launch runs, narrowed to the session's pinned
+   * selection, and warns once per launch about pinned servers it had to leave
+   * out because they are disabled, deleted or no longer in scope.
+   */
+  private async loadSelectedMcpServers(
+    session: SessionRow,
+    repositories: SessionRepositoryInfo[],
+    generation: SandboxGeneration
+  ): Promise<McpServerConfig[] | undefined> {
+    const { servers, dropped } = await this.launchContext.loadMcpServers(session, repositories);
+    if (dropped.length > 0) {
+      const names = new Intl.ListFormat("en", { style: "long", type: "conjunction" }).format(
+        dropped
+      );
+      const one = dropped.length === 1;
+      try {
+        this.config.recordWarning?.(
+          `Selected MCP ${one ? "server" : "servers"} ${names} ${one ? "is" : "are"} disabled, deleted or no longer in scope for this session, so this sandbox runs without ${one ? "it" : "them"}. Other tools remain available.`,
+          `mcp-dropped:${generation.sandboxId}:${generation.createdAt}`,
+          { scope: "mcp" }
+        );
+      } catch (error) {
+        this.log.warn("Could not record dropped MCP server warning", {
+          event: "mcp.dropped_notice_failed",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return servers;
+  }
+
+  /**
    * Resolves a launch's MCP servers and records them for the session's MCP
    * context. Returns the sandbox's share: personal servers stay out of a
    * sandbox that cannot tear them down per turn, and the record says why.
@@ -875,7 +909,7 @@ export class SandboxLifecycleManager
       const prebuiltImageId: string | null = selectedImage?.providerImageId ?? null;
       const prebuiltImageSha: string | null = selectedImage?.primaryBaseSha ?? null;
 
-      const mcpDefinitions = await this.launchContext.loadMcpServers(repositories);
+      const mcpDefinitions = await this.loadSelectedMcpServers(session, repositories, generation);
       const mcpServers = this.launchMcpServers(mcpDefinitions, {
         sessionId: session.session_name || session.id,
         sandboxToken: sandboxAuthToken,
@@ -1221,7 +1255,7 @@ export class SandboxLifecycleManager
       const vncEnabled = session.vnc_enabled === 1;
       const agentSlackNotifyEnabled =
         await this.launchContext.resolveAgentSlackNotifyEnabled(session);
-      const mcpDefinitions = await this.launchContext.loadMcpServers(repositories);
+      const mcpDefinitions = await this.loadSelectedMcpServers(session, repositories, generation);
       const mcpServers = this.launchMcpServers(mcpDefinitions, {
         sessionId: session.session_name || session.id,
         sandboxToken: sandboxAuthToken,

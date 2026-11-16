@@ -139,6 +139,39 @@ describe("managed MCP actual sandbox route + session authority", () => {
     await f.registry.update(f.server.id, { url: `${origin}/changed` });
     expect((await f.proxy({})).status).toBe(409);
   });
+  it("stops personal use on the next turn and call once the role loses mcp_connections.use", async () => {
+    const f = await fixture();
+    expect((await f.context({})).status).toBe(200);
+    // Everything a member holds except personal MCP use.
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO roles (id, key, name, normalized_name, description, is_system)
+         VALUES ('role_no_mcp', NULL, 'No MCP', 'no mcp', NULL, 0)`
+      ),
+      ...["sessions.read", "sessions.collaborate", "sessions.create"].map((permission) =>
+        env.DB.prepare(
+          "INSERT INTO role_permissions (role_id, permission_id) VALUES ('role_no_mcp', ?)"
+        ).bind(permission)
+      ),
+      env.DB.prepare(
+        "UPDATE user_role_assignments SET role_id = 'role_no_mcp' WHERE user_id = ?"
+      ).bind(alice),
+    ]);
+    expect((await f.proxy({})).status).toBe(403);
+    await runInSessionDO(f.stub, async (instance, state) => {
+      const context = new SessionMcpContext(
+        state.storage.sql,
+        env.DB,
+        (instance as unknown as SessionDOInternals).appEnv,
+        new SessionCoreRepository(state.storage.sql, (run) => state.storage.transactionSync(run)),
+        componentsOf(instance).sandboxRepository
+      );
+      expect(await context.prepare("alice-message")).toMatchObject({
+        servers: [],
+        unavailable: [{ name: "example", code: "mcp_denied" }],
+      });
+    });
+  });
   it("preserves an existing launch binding after an unchanged editor save", async () => {
     const f = await fixture();
     const initialized = await f.proxy({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
@@ -361,6 +394,18 @@ describe("managed MCP actual sandbox route + session authority", () => {
     expect(withheldRun.sent).toMatchObject({ messageId: withheldRun.messageId });
     expect(withheldRun.sent).not.toHaveProperty("managedMcp");
     expect(withheldRun.warnings).toEqual([]);
+  });
+  it("explains an automation turn that may not use the personal servers it selected", async () => {
+    const run = await dispatch([personal], { source: "automation", canonicalUserId: alice });
+    expect(run.sent).toMatchObject({
+      managedMcp: { messageId: run.messageId, servers: [], unavailable: [] },
+    });
+    expect(run.warnings).toHaveLength(1);
+    expect(JSON.parse(run.warnings[0].data)).toMatchObject({
+      scope: "mcp",
+      messageId: run.messageId,
+      message: expect.stringContaining("Personal MCP tracker isn't used on this turn."),
+    });
   });
   it("withholds personal servers once the sandbox reports a runtime older than its launch assumed", async () => {
     const f = await fixture();

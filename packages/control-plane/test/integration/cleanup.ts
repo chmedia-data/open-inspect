@@ -29,6 +29,7 @@ export async function cleanD1Tables(): Promise<void> {
     DELETE FROM session_pull_requests;
     DELETE FROM session_repositories;
     DELETE FROM child_admission_leases;
+    DELETE FROM session_mcp_servers;
     DELETE FROM session_skill_revisions;
     DELETE FROM session_skill_manifests;
     DELETE FROM session_collaborators;

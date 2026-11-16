@@ -29,10 +29,45 @@ export interface SandboxLaunchContextReader {
 }
 
 export interface McpServerLookup {
-  /** A scoped server applies when any member matches; empty for repo-less sessions. */
+  /**
+   * A scoped server applies when any member matches; empty for repo-less sessions.
+   * `selectedIds` narrows the result to the session's pinned servers.
+   */
   getForLaunch(
-    repositories: Array<{ repoOwner: string; repoName: string }>
+    repositories: Array<{ repoOwner: string; repoName: string }>,
+    selectedIds?: readonly string[] | null
   ): Promise<McpServerConfig[]>;
+}
+
+/** The MCP servers one launch runs, and the pinned ones it had to leave out. */
+export interface LaunchMcpServers {
+  servers: McpServerConfig[] | undefined;
+  /** Names of pinned servers that are disabled, deleted or out of the session's scope. */
+  dropped: string[];
+}
+
+/** The servers pinned in a session row, or null when the session runs every server in scope. */
+export function parsePinnedMcpSelection(
+  raw: string | null | undefined
+): { id: string; name: string }[] | null {
+  if (raw == null) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every(
+        (entry) =>
+          typeof entry === "object" &&
+          entry !== null &&
+          typeof entry.id === "string" &&
+          typeof entry.name === "string"
+      )
+    )
+      return parsed as { id: string; name: string }[];
+  } catch {
+    // Fall through: an unreadable pin must never widen to every server.
+  }
+  return [];
 }
 
 export interface SlackAgentNotifyLookup {
@@ -210,26 +245,40 @@ export class SandboxLaunchContext {
     }
   }
 
+  /**
+   * The MCP servers this launch runs: every enabled server in the session's scope, narrowed to the
+   * servers pinned at creation when the session selected some. Fresh spawn, restore and snapshot
+   * restore all come through here, so each re-applies the pin.
+   */
   async loadMcpServers(
+    session: Pick<SessionRow, "mcp_selection">,
     repositories: SessionRepositoryInfo[]
-  ): Promise<McpServerConfig[] | undefined> {
+  ): Promise<LaunchMcpServers> {
+    const pinned = parsePinnedMcpSelection(session.mcp_selection);
     try {
-      if (!this.config.mcpServerLookup) return undefined;
+      if (!this.config.mcpServerLookup) return { servers: undefined, dropped: [] };
       const servers = await this.config.mcpServerLookup.getForLaunch(
-        repositories.map(({ repoOwner, repoName }) => ({ repoOwner, repoName }))
+        repositories.map(({ repoOwner, repoName }) => ({ repoOwner, repoName })),
+        pinned?.map((server) => server.id) ?? null
       );
+      const loaded = new Set(servers.map((server) => server.id));
+      const dropped = (pinned ?? [])
+        .filter((server) => !loaded.has(server.id))
+        .map((server) => server.name);
       this.getLogger().info("MCP servers loaded", {
         event: "mcp.loaded",
-        count: servers?.length ?? 0,
-        names: servers?.map((s) => s.name) ?? [],
+        count: servers.length,
+        names: servers.map((s) => s.name),
+        selection: pinned ? "selected" : "all",
+        ...(dropped.length ? { dropped } : {}),
       });
-      return servers?.length ? servers : undefined;
+      return { servers: servers.length ? servers : undefined, dropped };
     } catch (err) {
       this.getLogger().warn("Failed to load MCP servers", {
         event: "mcp.load_failed",
         error: String(err),
       });
-      return undefined;
+      return { servers: undefined, dropped: [] };
     }
   }
 

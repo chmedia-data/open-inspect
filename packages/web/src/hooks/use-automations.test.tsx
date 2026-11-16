@@ -42,6 +42,7 @@ function automation(id: string, name: string): AutomationListItem {
     repositories: [],
     environmentIds: [],
     providerSelections: {},
+    mcpServerIds: [],
     ownerTeamId: null,
     recentExecutions: [],
     capabilities: { canRead: true, canManage: true, canTrigger: true },

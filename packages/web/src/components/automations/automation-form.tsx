@@ -14,6 +14,14 @@ import { useProviderAccounts } from "@/hooks/use-provider-accounts";
 import { ProviderAuthControls } from "@/components/provider-auth-controls";
 import { setProviderSelection } from "@/lib/provider-selection";
 import { FieldDescription } from "./automation-form-field";
+import {
+  McpServerPicker,
+  isPersonalMcpServer,
+  mcpPickerServers,
+} from "@/components/mcp-server-picker";
+import { useMcpConnectionStatus, useMcpServers } from "@/hooks/use-mcp-servers";
+import { useCurrentUserAuthorization } from "@/hooks/use-current-user-authorization";
+import { useAuthSession } from "@/lib/auth-session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAutomationTargets } from "./use-automation-targets";
@@ -43,6 +51,8 @@ interface AutomationFormProps {
   onSubmit: (values: AutomationFormValues) => void;
   submitting: boolean;
   requireTeam?: boolean;
+  /** The automation's owner when editing; personal MCP servers act as them. */
+  ownerUserId?: string | null;
 }
 
 export function AutomationForm({
@@ -51,6 +61,7 @@ export function AutomationForm({
   onSubmit,
   submitting,
   requireTeam = false,
+  ownerUserId,
 }: AutomationFormProps) {
   const [teamId, setTeamId] = useState(initialValues?.teamId ?? null);
   const scope = useResourceTeams("automation");
@@ -86,6 +97,28 @@ export function AutomationForm({
     repos,
   });
   const { selectedEnvironmentIds, buildRepositoriesPayload } = targets;
+
+  const [mcpServerIds, setMcpServerIds] = useState<string[]>(initialValues?.mcpServerIds ?? []);
+  const { servers: mcpServers } = useMcpServers();
+  const mcpConnectionStatus = useMcpConnectionStatus();
+  const { hasPermission } = useCurrentUserAuthorization();
+  const { data: authSession } = useAuthSession();
+  const isOwner = mode === "create" || (!!ownerUserId && ownerUserId === authSession?.user?.id);
+  // Mirrors the control plane's save-time rules (routes/automation-mcp.ts), which stay the authority.
+  const personalMcpDisabledReason = !hasPermission("mcp_connections.use")
+    ? "Personal servers need the mcp_connections.use permission."
+    : teamId !== null
+      ? "Team automations cannot use personal servers; use a server with shared credentials."
+      : trigger.type !== "schedule"
+        ? "Only scheduled automations can use personal servers."
+        : !isOwner
+          ? "Only the automation's owner can add personal servers."
+          : null;
+  const ownerLocked =
+    !isOwner &&
+    (initialValues?.mcpServerIds ?? []).some((id) =>
+      mcpServers.some((server) => server.id === id && isPersonalMcpServer(server))
+    );
   const environmentsUsable =
     (mode === "edit" &&
       sameEnvironmentIds(selectedEnvironmentIds, initialValues?.environmentIds ?? [])) ||
@@ -166,8 +199,13 @@ export function AutomationForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formEvaluation.valid || !scopeValid || !environmentsUsable || submitting) return;
-    onSubmit({ ...formEvaluation.values, ...(mode === "create" ? { teamId } : {}) });
+    if (!formEvaluation.valid || !scopeValid || !environmentsUsable || ownerLocked || submitting)
+      return;
+    onSubmit({
+      ...formEvaluation.values,
+      mcpServerIds,
+      ...(mode === "create" ? { teamId } : {}),
+    });
   };
 
   return (
@@ -252,6 +290,26 @@ export function AutomationForm({
         ))}
       </fieldset>
 
+      <fieldset className="space-y-3 rounded-md border border-border-muted p-4">
+        <legend className="px-1 text-sm font-medium text-foreground">MCP servers</legend>
+        <FieldDescription className="mb-3">
+          Servers each run&apos;s sandbox runs. None are selected by default. Personal servers act
+          as the automation&apos;s owner.
+        </FieldDescription>
+        <McpServerPicker
+          servers={mcpPickerServers(
+            mcpServers,
+            buildRepositoriesPayload().map((repo) => `${repo.repoOwner}/${repo.repoName}`),
+            mcpServerIds
+          )}
+          connectionStatus={mcpConnectionStatus}
+          value={mcpServerIds}
+          onChange={(next) => setMcpServerIds(next ?? [])}
+          personalDisabledReason={personalMcpDisabledReason}
+          disabled={submitting || ownerLocked}
+        />
+      </fieldset>
+
       <AutomationTriggerConfigurationFields
         key={trigger.type}
         mode={mode}
@@ -269,11 +327,20 @@ export function AutomationForm({
         onChange={setInstructions}
       />
 
+      {ownerLocked && (
+        <p className="text-sm text-muted-foreground" role="status">
+          This automation uses its owner&apos;s personal MCP servers, so only its owner can change
+          it. You can still pause it.
+        </p>
+      )}
+
       {/* Submit */}
       <div className="flex justify-end gap-2">
         <Button
           type="submit"
-          disabled={submitting || !formEvaluation.valid || !scopeValid || !environmentsUsable}
+          disabled={
+            submitting || !formEvaluation.valid || !scopeValid || !environmentsUsable || ownerLocked
+          }
         >
           {submitting
             ? mode === "create"
