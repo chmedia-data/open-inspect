@@ -25,6 +25,7 @@
  */
 
 import { once } from "node:events";
+import { statfs } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { WebSocketServer } from "ws";
@@ -48,6 +49,9 @@ import { createDockerTransport } from "./docker-transport";
 import { createDockerPortalServer } from "./docker-portal-server";
 import { requireDockerSandboxNetwork, resolveDockerPortalConfig } from "../sandbox/docker-portals";
 import { resolveSandboxBackendName } from "../sandbox/provider-name";
+import { createDockerAdmission } from "../sandbox/docker-admission";
+import { dockerSessionListPath, resolveDockerSandboxLimits } from "../sandbox/docker-limits";
+import { DOCKER_REAPER_INTERVAL_MS, reapDockerSandboxes } from "../sandbox/docker-reaper";
 import { createNodeBackgroundTasks, settlesWithin } from "./background-tasks";
 import { openNodeCacheDatabase } from "./cache-database";
 import type { NodeHostSettings } from "./config";
@@ -192,8 +196,32 @@ async function boot(
     log,
   });
   const dockerTransport = createDockerTransport(config.DOCKER_SOCKET_PATH);
+  const dockerBackend = resolveSandboxBackendName(config.SANDBOX_PROVIDER) === "docker";
+  const dockerLimits = dockerBackend ? resolveDockerSandboxLimits(config) : undefined;
   const platform: Platform = {
     DOCKER_TRANSPORT: dockerTransport,
+    DOCKER_ADMISSION: dockerLimits
+      ? createDockerAdmission({
+          maxRunning: dockerLimits.maxRunning,
+          minFreeDiskPercent: dockerLimits.minFreeDiskPercent,
+          countRunning: async () => {
+            const list = await dockerTransport.request(
+              "GET",
+              dockerSessionListPath(config.DEPLOYMENT_NAME, false)
+            );
+            if (list.status !== 200 || !Array.isArray(list.body)) {
+              throw new Error(`Docker Engine list failed (HTTP ${list.status})`);
+            }
+            return list.body.length;
+          },
+          // The data directory shares the Docker data volume in the documented
+          // deployment, so its free space is what sandbox writes consume.
+          freeDiskPercent: async () => {
+            const stats = await statfs(settings.dataDir);
+            return (stats.bavail / stats.blocks) * 100;
+          },
+        })
+      : undefined,
     DB: db,
     SESSION: createNodeSessionRuntimeDispatch(registry),
     REPOS_CACHE: new SqlCacheStore(cacheDb),
@@ -201,10 +229,7 @@ async function boot(
     JOBS: jobs,
   };
   const env: Env = { ...config, ...platform };
-  const portalConfig =
-    resolveSandboxBackendName(config.SANDBOX_PROVIDER) === "docker"
-      ? resolveDockerPortalConfig(config)
-      : undefined;
+  const portalConfig = dockerBackend ? resolveDockerPortalConfig(config) : undefined;
   const portal = portalConfig
     ? createDockerPortalServer({
         transport: dockerTransport,
@@ -218,6 +243,24 @@ async function boot(
     portal.server.listen(portalConfig.port, settings.host);
     await once(portal.server, "listening");
   }
+  const sessionIndex = new SessionIndexStore(db);
+  const reaper = dockerLimits
+    ? setInterval(() => {
+        reapDockerSandboxes({
+          transport: dockerTransport,
+          deploymentName: config.DEPLOYMENT_NAME,
+          stoppedRetentionMs: dockerLimits.stoppedRetentionMs,
+          sessionExists: (id) => sessionIndex.exists(id),
+          nowMs: Date.now(),
+        }).then(
+          (removed) => {
+            if (removed.length) log.info("docker.reaped", { container_ids: removed });
+          },
+          (error) => log.warn("docker.reap_failed", { error: String(error) })
+        );
+      }, DOCKER_REAPER_INTERVAL_MS).unref()
+    : undefined;
+  acquire(() => clearInterval(reaper));
 
   const processTasks = createNodeBackgroundTasks(log);
   const host: ControlPlaneHost = { backgroundTasks: () => processTasks };
@@ -295,6 +338,7 @@ async function boot(
     draining = true;
     // Portal upgrades are independent of session sockets and must not hold shutdown open.
     portal?.close();
+    clearInterval(reaper);
     const deadlineMs = Date.now() + settings.shutdownTimeoutMs;
     const remaining = (): number => Math.max(0, deadlineMs - Date.now());
     log.info("node_host.draining", {

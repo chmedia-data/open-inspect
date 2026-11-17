@@ -9,6 +9,7 @@ import type { FetchClient, QueueMetricsSource } from "./platform-ports";
 import type { SessionRuntimeDispatch } from "./session/runtime-client";
 import type { ObjectStorage } from "./storage/object-storage";
 import type { DockerTransport } from "./sandbox/docker-transport";
+import type { DockerAdmission } from "./sandbox/docker-admission";
 
 /**
  * The deployment's configuration: variables and secrets, every one a string,
@@ -70,6 +71,14 @@ export interface EnvConfig {
   DOCKER_PORTAL_BASE_DOMAIN?: string;
   DOCKER_PORTAL_PUBLIC_PORT?: string;
   DOCKER_PORTAL_SCHEME?: string;
+  DOCKER_SANDBOX_MEMORY_MB?: string;
+  DOCKER_SANDBOX_SWAP_MB?: string;
+  DOCKER_SANDBOX_CPUS?: string;
+  DOCKER_SANDBOX_PIDS_LIMIT?: string;
+  DOCKER_SANDBOX_RUNTIME?: string;
+  DOCKER_SANDBOX_MAX_RUNNING?: string;
+  DOCKER_SANDBOX_MIN_FREE_DISK_PERCENT?: string;
+  DOCKER_SANDBOX_STOPPED_RETENTION_MS?: string;
   MODAL_WORKSPACE?: string; // Modal workspace name
   MODAL_ENVIRONMENT?: string; // Modal environment name for dashboard URLs
   MODAL_ENVIRONMENT_WEB_SUFFIX?: string; // Modal environment web suffix for endpoint URLs
@@ -125,6 +134,8 @@ export interface EnvConfig {
 export interface Platform {
   /** Local Docker Engine access, supplied only by the Node host. */
   DOCKER_TRANSPORT?: DockerTransport;
+  /** Host-wide Docker sandbox start gate, supplied with the transport. */
+  DOCKER_ADMISSION?: DockerAdmission;
   /** The global store. Request paths take it injected and instrumented (`ctx.db`), never from here. */
   DB: SqlDatabase;
   /** Delivery to session runtimes, addressed by session id. */

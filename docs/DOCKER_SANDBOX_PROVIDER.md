@@ -87,8 +87,9 @@ TCP/UDP tunnels and IPv6-only sandbox networks are unsupported; the proxy uses p
 addresses on the configured Docker bridge.
 
 Snapshots, snapshot restore, prebuilt repository/environment images, provider-enforced lifetimes,
-and per-session resource settings remain unsupported. Image-build admission returns the existing
-unsupported-provider response. Control-plane inactivity and execution policies still apply.
+and per-session resource settings remain unsupported; the deployment-wide limits are described in
+[Isolation and resource limits](#isolation-and-resource-limits). Image-build admission returns the
+existing unsupported-provider response. Control-plane inactivity and execution policies still apply.
 Docker-in-Docker is disabled; session containers receive neither privileged mode nor the host
 socket. The control plane's socket access can administer the Docker host, so use this as a
 single-tenant deployment.
@@ -102,9 +103,105 @@ docker logs <container-id>
 ```
 
 Stopped containers retain their original session environment, including tokens and repo secrets. Do
-not commit their filesystem as reusable images. After a daemon outage or a logged
-`docker.create_cleanup_failed` / `docker.create_allocation_unresolved`, inspect the labeled
-containers for abandoned allocations. No background Docker orphan reaper is included.
+not commit their filesystem as reusable images. A reaper in the Node host removes abandoned
+containers; see [Reaping](#reaping).
+
+## Isolation and resource limits
+
+Session containers start with every Linux capability dropped except `CHOWN`, `DAC_OVERRIDE`,
+`FOWNER`, `KILL`, `SETGID` and `SETUID`, and with `no-new-privileges`. `NET_RAW` and `NET_ADMIN` are
+never granted, so sandbox code cannot open raw or packet sockets to forge source addresses or ARP
+replies on the shared bridge. Each kept capability was shown necessary by removing it and running
+the image's own `smoke_test.py verify`, a git clone, `apt-get install`, global and project
+`npm install`, and file ownership and signal checks:
+
+| Capability     | Without it                                                                   |
+| -------------- | ---------------------------------------------------------------------------- |
+| `CHOWN`        | Package scripts and tools that chown files fail                              |
+| `DAC_OVERRIDE` | `apt-get` cannot write its lists; global `npm install` fails                 |
+| `FOWNER`       | chmod of files owned by another user fails                                   |
+| `KILL`         | The runtime cannot end a process group whose members run as another user     |
+| `SETGID`       | `apt-get` fetchers cannot drop to `_apt`; the image verification probe fails |
+| `SETUID`       | `apt-get` fetchers cannot drop to `_apt`                                     |
+
+`FSETID`, `MKNOD`, `NET_BIND_SERVICE`, `SETFCAP`, `SETPCAP`, `SYS_CHROOT` and `AUDIT_WRITE` from
+Docker's default set showed no use and are dropped. Without `NET_BIND_SERVICE`, services inside a
+sandbox must listen on ports from 1024 up. The sandbox still runs as root inside its user namespace
+so agents can install system packages with `apt-get`; a non-root image would remove that. Root here
+holds only the capabilities above, and `no-new-privileges` stops setuid binaries from regaining
+others. To also map container root to an unprivileged host user, enable the daemon's `userns-remap`,
+an operator setting outside this provider.
+
+Each container gets memory, swap, CPU and PID limits. The Node host admits a new or resumed
+container only while fewer than `DOCKER_SANDBOX_MAX_RUNNING` session containers are running and the
+filesystem holding `DATA_DIR` has at least `DOCKER_SANDBOX_MIN_FREE_DISK_PERCENT` free. Starts are
+serialized, so two cannot take the last slot. A start that finds the host full waits in a bounded
+queue for up to a minute, polling for a slot, and is then refused; when the queue is full, further
+starts are refused at once. A disk below the watermark refuses immediately. The session shows the
+refusal as its sandbox error, and the refusal is transient, so it does not trip the spawn circuit
+breaker; the next prompt tries again. The free-space check assumes `DATA_DIR` shares a filesystem
+with Docker's data root, as in the Compose stack.
+
+| Variable                               | Default        | Purpose                                                   |
+| -------------------------------------- | -------------- | --------------------------------------------------------- |
+| `DOCKER_SANDBOX_MEMORY_MB`             | `2048`         | Memory limit per sandbox                                  |
+| `DOCKER_SANDBOX_SWAP_MB`               | `0`            | Swap allowed on top of memory                             |
+| `DOCKER_SANDBOX_CPUS`                  | `1`            | CPU limit per sandbox, fractional allowed                 |
+| `DOCKER_SANDBOX_PIDS_LIMIT`            | `2048`         | Processes and threads per sandbox                         |
+| `DOCKER_SANDBOX_MAX_RUNNING`           | `3`            | Running sandboxes admitted on this host                   |
+| `DOCKER_SANDBOX_MIN_FREE_DISK_PERCENT` | `10`           | Free space on the `DATA_DIR` filesystem required to start |
+| `DOCKER_SANDBOX_STOPPED_RETENTION_MS`  | 14 days        | How long a stopped sandbox stays resumable                |
+| `DOCKER_SANDBOX_RUNTIME`               | daemon default | OCI runtime, for example `runsc`                          |
+
+The defaults fit a 2 vCPU, 8 GiB host such as an AWS `t3a.large`: three 2 GiB sandboxes leave about
+2 GiB for the control plane, Docker and the operating system. A sandbox that exceeds its memory is
+OOM-killed inside its own cgroup, not the host. Raise the limits on a larger host.
+
+The writable container layer has no size quota. Docker supports one only on `overlay2` over XFS with
+project quotas, which this provider does not assume. Put Docker's data root on a separate volume
+from the control plane's database, or rely on the disk watermark, which refuses new starts but does
+not stop a running sandbox from filling the disk.
+
+### gVisor
+
+`DOCKER_SANDBOX_RUNTIME` is unset by default and containers use the daemon's default runtime. To run
+sandboxes under gVisor, install `runsc` on the host, register it in `/etc/docker/daemon.json`
+(`"runtimes": {"runsc": {"path": "/usr/local/bin/runsc"}}`), restart Docker, and set
+`DOCKER_SANDBOX_RUNTIME=runsc`. The value must name a registered runtime; an unknown name fails
+every create with a Docker HTTP 400. gVisor narrows the kernel attack surface, but it is not network
+isolation and does not replace the capability and firewall settings described here. Check the
+sandbox image's toolchain under gVisor before relying on it.
+
+### Network isolation
+
+All session containers share one bridge with the control plane. Without `NET_RAW` a sandbox cannot
+forge its source IP or ARP replies, but it can still reach other containers on the bridge and the
+control plane's other listeners unless the host firewall restricts them. The host should:
+
+- drop sandbox-to-sandbox traffic on the bridge,
+- bind each sandbox veth to its assigned IP and MAC address,
+- allow sandboxes to reach the control plane only on its API port (8787 in Compose), not the portal
+  listener or anything else.
+
+A network per sandbox would remove the shared bridge. The provider would create a network for each
+container and attach the control-plane container to it, which needs the control plane's own
+container ID and a create, connect, disconnect and remove step per session that must also be
+recovered after crashes. Every sandbox network adds an interface and an address on the control
+plane, a bridge and iptables rules on the host, and a subnet from Docker's default pools, which
+allow about 30 such networks. The portal proxy would need to follow each sandbox onto its network.
+That is not contained enough to do here, so the shared bridge stays and the firewall rules above
+carry the isolation.
+
+### Reaping
+
+Every 10 minutes the Node host lists this deployment's session containers and removes:
+
+- stopped containers whose last stop is older than `DOCKER_SANDBOX_STOPPED_RETENTION_MS`, and
+- any container, running or stopped, older than an hour whose session no longer exists.
+
+A stopped container inside its retention is a paused session and is kept. Resuming a session whose
+container was removed starts a fresh sandbox, losing uncommitted work in the old one. A running
+container whose session still exists is never reaped; idle shutdown stops it first.
 
 ## Open a local portal
 
