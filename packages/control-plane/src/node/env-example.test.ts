@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  BOT_SERVICE_VARIABLE_NAMES,
   ENV_CONFIG_KEY_NAMES,
   NODE_HOST_VARIABLE_NAMES,
   REQUIRED_ENV_CONFIG_KEY_NAMES,
@@ -120,6 +121,7 @@ describe(".env.example", () => {
     const expected = [
       ...ENV_CONFIG_KEY_NAMES,
       ...NODE_HOST_VARIABLE_NAMES,
+      ...BOT_SERVICE_VARIABLE_NAMES,
       ...OBJECT_STORAGE_VARIABLE_NAMES,
       ...AWS_CREDENTIAL_VARIABLE_NAMES,
       ...COMPOSE_VARIABLES,
