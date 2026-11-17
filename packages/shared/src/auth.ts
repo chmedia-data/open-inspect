@@ -112,3 +112,17 @@ export async function verifyCallbackFromControlPlane<T extends { signature: stri
     env.SERVICE_AUTH_SECRET && (await verifyCallbackSignature(payload, env.SERVICE_AUTH_SECRET))
   );
 }
+
+/**
+ * Decode a PEM private key (PKCS#8 or PKCS#1) to its DER bytes.
+ *
+ * Accepts the key with real newlines or with the two-character `\n` an
+ * environment file leaves when a multi-line key is stored on one line.
+ */
+export function parsePemPrivateKey(pem: string): Uint8Array {
+  const pemContents = pem
+    .replace(/-----(BEGIN|END) (RSA )?PRIVATE KEY-----/g, "")
+    .replace(/\\n/g, "")
+    .replace(/\s/g, "");
+  return Uint8Array.from(atob(pemContents), (char) => char.charCodeAt(0));
+}

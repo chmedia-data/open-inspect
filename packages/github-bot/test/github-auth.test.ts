@@ -37,6 +37,13 @@ async function generateTestKeyPair(): Promise<{ privateKeyPem: string }> {
 }
 
 describe("generateAppJwt", () => {
+  it("signs with a key stored on one line with literal \\n sequences", async () => {
+    const { privateKeyPem } = await generateTestKeyPair();
+    const oneLine = privateKeyPem.replace(/\n/g, "\\n");
+    expect(oneLine).not.toContain("\n");
+    expect((await generateAppJwt("123", oneLine)).split(".")).toHaveLength(3);
+  });
+
   it("produces a valid 3-part JWT", async () => {
     const { privateKeyPem } = await generateTestKeyPair();
     const jwt = await generateAppJwt("12345", privateKeyPem);

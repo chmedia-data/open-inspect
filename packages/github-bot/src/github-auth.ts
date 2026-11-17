@@ -1,4 +1,5 @@
 import { DEFAULT_APP_NAME } from "@open-inspect/shared/app-name";
+import { parsePemPrivateKey } from "@open-inspect/shared/auth";
 import { z } from "zod";
 
 export const GITHUB_API_REQUEST_TIMEOUT_MS = 10_000;
@@ -23,22 +24,6 @@ function base64UrlEncode(input: Uint8Array | string): string {
   const bytes = typeof input === "string" ? new TextEncoder().encode(input) : input;
   const base64 = btoa(String.fromCharCode(...bytes));
   return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-}
-
-function parsePemPrivateKey(pem: string): Uint8Array {
-  const pemContents = pem
-    .replace(/-----BEGIN RSA PRIVATE KEY-----/g, "")
-    .replace(/-----END RSA PRIVATE KEY-----/g, "")
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\s/g, "");
-
-  const binaryString = atob(pemContents);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
 }
 
 async function importPrivateKey(pem: string): Promise<CryptoKey> {
