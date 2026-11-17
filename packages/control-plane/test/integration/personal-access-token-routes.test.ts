@@ -7,6 +7,7 @@
 import { env, SELF } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PermissionId } from "@open-inspect/shared/rbac";
+import { personalAccessTokenDisplayPrefix } from "../../src/auth/personal-access-token";
 import { AutomationStore } from "../../src/db/automation-store";
 import { PersonalAccessTokenStore } from "../../src/db/personal-access-tokens";
 import { SessionIndexStore } from "../../src/db/session-index";
@@ -321,11 +322,20 @@ describe("driving sessions with a token", () => {
       });
       expect(response.status).toBe(200);
       const { messageId } = await response.json<{ messageId: string }>();
-      const [row] = await queryDO<{ mcp_eligible: number }>(
+      const [row] = await queryDO<Record<string, unknown>>(
         stub,
-        "SELECT mcp_eligible FROM messages WHERE id = ?",
+        "SELECT * FROM messages WHERE id = ?",
         messageId
       );
+      // The prompt keeps the token's id, so personal MCP use is checked against it again
+      // later, but never the token itself.
+      const tokenRow = await env.DB.prepare(
+        "SELECT id FROM personal_access_tokens WHERE display_prefix = ?"
+      )
+        .bind(personalAccessTokenDisplayPrefix(token))
+        .first<{ id: string }>();
+      expect(row?.admitted_personal_access_token_id).toBe(tokenRow?.id);
+      expect(JSON.stringify(row)).not.toContain(token);
       return row?.mcp_eligible;
     };
 

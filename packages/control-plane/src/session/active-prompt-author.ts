@@ -5,6 +5,7 @@ export const activePromptAuthorSchema = z.object({
   userId: z.string(),
   canonicalUserId: z.string().nullable().optional(),
   mcpEligible: z.boolean().optional(),
+  personalAccessTokenId: z.string().optional(),
   scmUserId: z.string().nullable(),
   scmLogin: z.string().nullable(),
   scmName: z.string().nullable(),

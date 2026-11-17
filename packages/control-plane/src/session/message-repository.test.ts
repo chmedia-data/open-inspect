@@ -266,6 +266,7 @@ describe("MessageRepository", () => {
       1000,
       "alice",
       1,
+      null,
     ]);
   });
 
@@ -361,6 +362,7 @@ describe("MessageRepository", () => {
       2000,
       null,
       0,
+      null,
     ]);
   });
 

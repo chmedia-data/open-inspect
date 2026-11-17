@@ -529,6 +529,31 @@ describe("POST /sessions/:parentId/children — spawn child", () => {
     ]);
   });
 
+  it("binds every child of a token's turn to that token", async () => {
+    const { parentName, stub, sandboxToken } = await setupParent({
+      repoId: 12345,
+      userId: "user-1",
+      canonicalUserId: "11111111111111111111111111111111",
+    });
+    await queryDO(
+      stub,
+      "UPDATE messages SET mcp_eligible = 1, admitted_personal_access_token_id = 'pat-1' WHERE status = 'processing'"
+    );
+    const response = await SELF.fetch(`https://test.local/sessions/${parentName}/children`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sandboxToken}` },
+      body: JSON.stringify({ title: "Tracker child", prompt: "Use the tracker" }),
+    });
+    expect(response.status).toBe(201);
+    const { sessionId } = await response.json<{ sessionId: string }>();
+    expect(
+      await queryDO(
+        env.SESSION.get(env.SESSION.idFromName(sessionId)),
+        "SELECT mcp_eligible, admitted_personal_access_token_id FROM messages"
+      )
+    ).toEqual([{ mcp_eligible: 1, admitted_personal_access_token_id: "pat-1" }]);
+  });
+
   it("inherits automation lineage from the parent", async () => {
     const { parentName, sandboxToken, store } = await setupParent({
       userId: "user-1",

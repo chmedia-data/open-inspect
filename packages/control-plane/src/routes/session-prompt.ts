@@ -131,6 +131,10 @@ export async function handleSessionPrompt(
         // connection's reach at the external service is beyond what any grant can narrow.
         (ctx.principal?.kind === "personal-access-token" &&
           (ctx.authorization?.permissions.includes("mcp_connections.use") ?? false))),
+    // Its id, not the token, so revoking or narrowing the token later stops this prompt's work.
+    ...(ctx.principal?.kind === "personal-access-token"
+      ? { personalAccessTokenId: ctx.principal.tokenId }
+      : {}),
     source: body.source || "web",
     model: body.model,
     reasoningEffort: body.reasoningEffort,

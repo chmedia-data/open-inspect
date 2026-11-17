@@ -805,6 +805,12 @@ export const MIGRATIONS: readonly SchemaMigration[] = [
     description: "Distinguish bridge process replacement from transport reconnect",
     run: "ALTER TABLE sandbox ADD COLUMN mcp_bridge_instance_id TEXT",
   },
+  // 60 is reserved for the session MCP selection migration.
+  {
+    id: 61,
+    description: "Retain the personal access token a prompt was admitted under",
+    run: "ALTER TABLE messages ADD COLUMN admitted_personal_access_token_id TEXT",
+  },
 ];
 
 function removePersistedHookOutputTails(sql: SqlStorage): void {

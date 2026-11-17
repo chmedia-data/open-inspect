@@ -126,6 +126,46 @@ describe("ChildSessionsHandler", () => {
     expect(await handler.getActivePromptAuthor().json()).not.toHaveProperty("mcpEligible");
   });
 
+  it("carries the token a prompt was admitted under to children and follow-ups", async () => {
+    const { handler, repository, getSession, enqueuePrompt } = createHandler();
+    getSession.mockReturnValue(createSession({ parent_session_id: "parent-1" }));
+    repository.getProcessingMessageAuthority.mockReturnValue({
+      canonicalUserId: "alice",
+      mcpEligible: true,
+      personalAccessTokenId: "pat-1",
+    } as ReturnType<typeof repository.getProcessingMessageAuthority>);
+    expect(await handler.getActivePromptAuthor().json()).toMatchObject({
+      personalAccessTokenId: "pat-1",
+    });
+    expect(await handler.getSpawnContext().json()).toMatchObject({
+      promptAuthor: { personalAccessTokenId: "pat-1" },
+    });
+
+    await handler.parentPrompt(
+      new Request("http://internal/internal/parent-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          parentSessionId: "parent-1",
+          content: "Continue",
+          author: {
+            userId: "owner-1",
+            canonicalUserId: "alice",
+            mcpEligible: true,
+            personalAccessTokenId: "pat-1",
+            scmUserId: null,
+            scmLogin: null,
+            scmName: null,
+            scmEmail: null,
+          },
+        }),
+      })
+    );
+    expect(enqueuePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ mcpEligible: true, personalAccessTokenId: "pat-1" })
+    );
+  });
+
   describe("parentPrompt", () => {
     function request(body: unknown): Request {
       const withAuthor =
