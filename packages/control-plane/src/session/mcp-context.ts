@@ -12,6 +12,7 @@ import { McpConnectionStore, connectionBinding, type McpGrantBinding } from "../
 import { McpServerStore } from "../db/mcp-servers";
 import { McpError, mcpErrorResponse } from "../mcp/errors";
 import { assertMcpUserAccess } from "../mcp/authorization";
+import { assertPersonalAccessTokenDelegation } from "../mcp/personal-access-token-delegation";
 import { MCP_STREAM_TIMEOUT_MS, MCP_UPSTREAM_HEADERS_TIMEOUT_MS } from "../mcp/relay";
 import { personalMcpWithheldReason, type PersonalMcpWithheldCode } from "../mcp/runtime-config";
 import {
@@ -50,6 +51,8 @@ export interface McpProxySnapshot {
   messageId?: string;
   revision?: number;
   grant?: McpGrantBinding;
+  /** The token the prompt was admitted under, rechecked before each relayed call. */
+  personalAccessTokenId?: string;
 }
 interface PreparedContext {
   sandboxId: string;
@@ -157,6 +160,13 @@ export class SessionMcpContext {
       { mcp_servers: string | null } | undefined;
     return row?.mcp_servers ? JSON.parse(row.mcp_servers) : [];
   }
+  /** The token a prompt was admitted under, or null for a prompt that was not a token's. */
+  private admittedTokenId(messageId: string): string | null {
+    const row = this.sql
+      .exec("SELECT admitted_personal_access_token_id FROM messages WHERE id = ?", messageId)
+      .toArray()[0] as { admitted_personal_access_token_id: string | null } | undefined;
+    return row?.admitted_personal_access_token_id ?? null;
+  }
   private active(): MessageContext | null {
     return (
       (this.sql
@@ -210,12 +220,12 @@ export class SessionMcpContext {
         if (runtime?.mcp_runtime_version !== 1) throw new McpError("mcp_unsupported");
         if (!sandbox?.modal_sandbox_id || sandbox.status !== "ready" || sandbox.fenced || !session)
           throw new McpError("mcp_execution_inactive");
-        userAccess ??= assertMcpUserAccess(
-          this.db,
-          this.env,
-          message.admitted_canonical_user_id,
-          session.session_name || session.id
-        );
+        const userId = message.admitted_canonical_user_id;
+        const tokenId = this.admittedTokenId(messageId);
+        userAccess ??= Promise.all([
+          assertMcpUserAccess(this.db, this.env, userId, session.session_name || session.id),
+          tokenId ? assertPersonalAccessTokenDelegation(this.db, tokenId, userId) : undefined,
+        ]).then(() => undefined);
         await userAccess;
         const server = await new McpServerStore(this.db, this.env.REPO_SECRETS_ENCRYPTION_KEY!).get(
           entry.id
@@ -391,6 +401,8 @@ export class SessionMcpContext {
         snapshot.messageId = active.id;
         snapshot.revision = active.mcp_revision;
         snapshot.grant = grant;
+        const tokenId = this.admittedTokenId(active.id);
+        if (tokenId) snapshot.personalAccessTokenId = tokenId;
       }
       if (input.expected && JSON.stringify(snapshot) !== JSON.stringify(input.expected))
         throw new McpError("mcp_context_changed", 409);
