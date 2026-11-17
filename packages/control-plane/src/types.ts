@@ -122,6 +122,9 @@ export interface EnvConfig {
   SECRETS_CAP_ENFORCEMENT?: string; // "enforce" (default) fails spawn/build on oversized secret payloads; set "warn" to only log
   TEAMS_ENFORCEMENT?: string; // "off" | "shadow" (default) | "on"
 
+  // Models
+  DEFAULT_MODEL?: string; // Model for sessions, prompts and automations that name none; a catalog id, defaults to the catalog's DEFAULT_MODEL. Read through resolveDefaultModel
+
   // Logging
   LOG_LEVEL?: string; // "debug" | "info" | "warn" | "error" (default: "info")
 }

@@ -19,9 +19,9 @@ import type {
 } from "@open-inspect/shared";
 import { githubAutofixOriginSchema } from "@open-inspect/shared";
 import {
-  DEFAULT_MODEL,
   getDefaultReasoningEffort,
   getValidModelOrReplacement,
+  type ValidModel,
 } from "@open-inspect/shared/models";
 import type { SandboxEvent } from "@open-inspect/shared/types/sandbox-events";
 import { isSessionPromptable } from "@open-inspect/shared/types/session-activity";
@@ -180,6 +180,8 @@ export class SessionMessageQueue {
     private readonly getExecutionTimeoutMs: () => number,
     private readonly mayDispatch: () => boolean,
     private readonly getSandboxPromptBlockReason: () => string | null,
+    /** From `resolveDefaultModel`: what a session with no stored model runs on. */
+    private readonly defaultModel: ValidModel,
     private readonly prepareManagedMcp?: (messageId: string) => Promise<ManagedMcpExecution | null>,
     /** Records warnings the sandbox cannot give itself, once the prompt is running. */
     private readonly reportManagedMcpWarnings?: (messageId: string) => void
@@ -193,7 +195,7 @@ export class SessionMessageQueue {
     const harness = getValidHarnessOrDefault(session?.harness);
     const selectionError =
       getHarnessCapabilities(harness).selectionPolicy === "strict"
-        ? await this.getProviderAuthenticationError(session?.model ?? DEFAULT_MODEL)
+        ? await this.getProviderAuthenticationError(session?.model ?? this.defaultModel)
         : null;
     const currentSession = this.repository.getSession();
     const recoveryHold = this.getSandboxPromptBlockReason() !== null || selectionError !== null;
@@ -445,7 +447,11 @@ export class SessionMessageQueue {
     const now = Date.now();
     const session = this.repository.getSession();
     const harness = getValidHarnessOrDefault(session?.harness);
-    const resolvedModel = resolveHarnessModel(harness, message.model || session?.model);
+    const resolvedModel = resolveHarnessModel(
+      harness,
+      message.model || session?.model,
+      this.defaultModel
+    );
     const inheritedReasoningEffort = inheritReasoningEffort(
       harness,
       resolvedModel,
@@ -923,7 +929,7 @@ export class SessionMessageQueue {
       const duplicate = this.findDuplicatePrompt(data, requestFingerprint);
       if (duplicate) return duplicate;
       const modelError = await this.getProviderAuthenticationError(
-        data.model || session?.model || DEFAULT_MODEL
+        data.model || session?.model || this.defaultModel
       );
       if (modelError) throw new HarnessModelIncompatibleError(modelError);
     }
@@ -962,7 +968,7 @@ export class SessionMessageQueue {
     }
 
     const effectiveModelForEffort =
-      messageModel || this.repository.getSession()?.model || DEFAULT_MODEL;
+      messageModel || this.repository.getSession()?.model || this.defaultModel;
     const incompatibility = checkHarnessPromptCompatibility(
       harness,
       effectiveModelForEffort,

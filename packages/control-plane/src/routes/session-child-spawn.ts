@@ -18,6 +18,7 @@ import {
 } from "@open-inspect/shared/models";
 import { generateId } from "../auth/crypto";
 import { getEffectiveEnabledModels } from "../db/model-preferences";
+import { resolveDefaultModel } from "../default-model";
 import { SessionIndexStore } from "../db/session-index";
 import { SessionMemorySelectionStore } from "../db/session-memory-selections";
 import { TeamMembershipStore } from "../db/team-memberships";
@@ -227,14 +228,21 @@ export async function handleSpawnChild(
   if (body.model !== undefined && !isValidModel(body.model)) {
     return error(`Invalid model "${body.model}". Valid models: ${VALID_MODELS.join(", ")}`, 400);
   }
-  const requestedModel = getValidModelOrDefault(body.model ?? spawnContext.model);
+  const defaultModel = resolveDefaultModel(env);
+  const requestedModel = getValidModelOrDefault(body.model ?? spawnContext.model, defaultModel);
   if (body.model !== undefined && !enabledModels.includes(requestedModel)) {
     return error(`Model "${body.model}" is not enabled`, 400);
   }
   const harness = spawnContext.harness;
   let selection;
   try {
-    selection = await resolveChildHarnessSelection(ctx.db, spawnContext, body, enabledModels);
+    selection = await resolveChildHarnessSelection(
+      ctx.db,
+      spawnContext,
+      body,
+      enabledModels,
+      defaultModel
+    );
   } catch (cause) {
     if (cause instanceof HarnessAdmissionError) return error(cause.message, cause.status);
     throw cause;

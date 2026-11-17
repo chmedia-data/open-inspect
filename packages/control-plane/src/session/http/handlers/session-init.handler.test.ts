@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_MODEL } from "@open-inspect/shared/models";
 import type { Logger } from "../../../logger";
 import { SessionInitHandler } from "./session-init.handler";
 import type { ParticipantRepository } from "../../participant-repository";
@@ -34,6 +35,7 @@ function createHandler() {
     "session-do-id",
     scheduleWarmSandbox,
     generateId,
+    DEFAULT_MODEL,
     now
   );
 

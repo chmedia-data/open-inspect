@@ -2,6 +2,15 @@
 
 New features, integrations, and notable improvements to Open-Inspect — newest first.
 
+## November 17, 2026
+
+**Configurable default model.** Set `DEFAULT_MODEL` on the control plane (`.env` on a Node host,
+Terraform `default_model` on Cloudflare) to choose the model that sessions, prompts, automations,
+and child sessions use when they name none. The web composer and automation form preselect it for
+users who have not picked a model. Unset keeps Claude Sonnet 4.6. An unknown model ID fails startup;
+a default that is not enabled under Settings › Models logs a warning. Existing sessions keep their
+model. See [Choosing a model](packages/docs/content/docs/models/choosing-a-model.mdx).
+
 ## November 14, 2026
 
 **Unknown models are rejected, and the MCP server can list them.** Creating a session or an

@@ -11,7 +11,6 @@ import {
 } from "@open-inspect/shared/harnesses";
 import {
   DEFAULT_ENABLED_MODELS,
-  DEFAULT_MODEL,
   MODEL_OPTIONS,
   isValidModel,
   normalizeModelId,
@@ -22,6 +21,7 @@ import {
   ModelPreferencesStore,
   ModelPreferencesValidationError,
 } from "../db/model-preferences";
+import { resolveDefaultModel } from "../default-model";
 import { createLogger } from "../logger";
 import { admit, dispatch } from "../routing/admit";
 import type { ControlPlaneHonoEnv } from "../routing/hono-env";
@@ -43,16 +43,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function getModelPreferences(
   request: Request,
-  _env: Env,
+  env: Env,
   _params: object,
   ctx: RequestContext
 ): Promise<Response> {
   const strict = new URL(request.url).searchParams.get("strict") === "true";
   const store = new ModelPreferencesStore(ctx.db);
+  // The deployment default rides along so clients pick what the server would.
+  const defaultModel = resolveDefaultModel(env);
 
   try {
     const snapshot = await store.getSnapshot();
-    return json({ enabledModels: snapshot.enabledModels, revision: snapshot.revision });
+    return json({
+      enabledModels: snapshot.enabledModels,
+      revision: snapshot.revision,
+      defaultModel,
+    });
   } catch (e) {
     logger.error("Failed to get model preferences", {
       error: e instanceof Error ? e.message : String(e),
@@ -61,7 +67,7 @@ async function getModelPreferences(
     });
     return strict
       ? error("Model preferences storage unavailable", 503)
-      : json({ enabledModels: DEFAULT_ENABLED_MODELS, revision: 0 });
+      : json({ enabledModels: DEFAULT_ENABLED_MODELS, revision: 0, defaultModel });
   }
 }
 
@@ -72,7 +78,7 @@ async function getModelPreferences(
  */
 async function listModels(
   _request: Request,
-  _env: Env,
+  env: Env,
   _params: object,
   ctx: RequestContext
 ): Promise<Response> {
@@ -107,7 +113,7 @@ async function listModels(
       ),
     }))
   );
-  return json({ defaultModel: DEFAULT_MODEL, models });
+  return json({ defaultModel: resolveDefaultModel(env), models });
 }
 
 async function setModelPreferences(
@@ -153,7 +159,7 @@ function parseModelPreferenceChanges(body: unknown): ModelPreferenceChange[] | R
 
 async function patchModelPreferences(
   request: Request,
-  _env: Env,
+  env: Env,
   _params: object,
   ctx: RequestContext
 ): Promise<Response> {
@@ -173,7 +179,11 @@ async function patchModelPreferences(
       request_id: ctx.request_id,
       trace_id: ctx.trace_id,
     });
-    return json({ enabledModels: snapshot.enabledModels, revision: snapshot.revision });
+    return json({
+      enabledModels: snapshot.enabledModels,
+      revision: snapshot.revision,
+      defaultModel: resolveDefaultModel(env),
+    });
   } catch (e) {
     if (e instanceof ModelPreferencesValidationError) return error(e.message, 400);
     if (e instanceof ModelPreferencesConflictError) return error(e.message, 409);

@@ -60,6 +60,15 @@ describe("readEnvConfig", () => {
     );
   });
 
+  it("rejects an unknown default model at startup", () => {
+    expect(() => readEnvConfig({ ...REQUIRED, DEFAULT_MODEL: "acme/not-a-model" })).toThrow(
+      'DEFAULT_MODEL "acme/not-a-model" is not a model in the catalog'
+    );
+    expect(readEnvConfig({ ...REQUIRED, DEFAULT_MODEL: "openai/gpt-5.5" }).DEFAULT_MODEL).toBe(
+      "openai/gpt-5.5"
+    );
+  });
+
   it("names every missing required variable at once", () => {
     expect(() => readEnvConfig({ DEPLOYMENT_NAME: "test", TOKEN_ENCRYPTION_KEY: "" })).toThrow(
       "Missing required configuration: GITHUB_BOT_USERNAME, TOKEN_ENCRYPTION_KEY, PROVIDER_ACCOUNTS_ENCRYPTION_KEY, REPO_SECRETS_ENCRYPTION_KEY"

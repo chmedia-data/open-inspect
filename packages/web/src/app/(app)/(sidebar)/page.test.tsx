@@ -340,6 +340,23 @@ describe("Home", () => {
     expect(sessionCreateBody()).toMatchObject({ environmentId: "env-1" });
   });
 
+  it("starts a user with no remembered model on the deployment default", async () => {
+    const deploymentDefault = "openai/gpt-5.4";
+    mocks.enabledModelsValue = [DEFAULT_MODEL, deploymentDefault];
+    mocks.defaultModelValue = deploymentDefault;
+    mocks.enabledModelOptionsValue.push({
+      category: "OpenAI",
+      models: [{ id: deploymentDefault, name: "GPT-5.4", description: "" }],
+    });
+    const user = userEvent.setup();
+    render(<Home />);
+
+    await user.type(screen.getByPlaceholderText("What do you want to build?"), "Fix the build");
+    await user.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => expect(sessionCreateBody()).toMatchObject({ model: deploymentDefault }));
+  });
+
   it("persists provider authentication and restores it on the next visit", async () => {
     const openAiModel = "openai/gpt-5.4";
     const accountId = "a".repeat(32);

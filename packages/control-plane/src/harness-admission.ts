@@ -9,6 +9,7 @@ import {
   type HarnessId,
 } from "@open-inspect/shared/harnesses";
 import {
+  DEFAULT_MODEL as CATALOG_DEFAULT_MODEL,
   getValidModelOrDefault,
   getValidModelOrReplacement,
   isValidReasoningEffort,
@@ -37,9 +38,10 @@ export class HarnessAdmissionError extends Error {
 /** The internal session boundary must retain the public admission's exact native choice. */
 export function resolveHarnessInitialization(
   harness: HarnessId,
-  input: { model?: string; reasoningEffort?: string | null }
+  input: { model?: string; reasoningEffort?: string | null },
+  defaultModel: ValidModel
 ): { model: string; reasoningEffort?: string } {
-  const model = resolveHarnessModel(harness, input.model);
+  const model = resolveHarnessModel(harness, input.model, defaultModel);
   if (getHarnessCapabilities(harness).selectionPolicy === "legacy_fallback")
     return { model, reasoningEffort: input.reasoningEffort ?? undefined };
   const incompatible = checkHarnessCompatibility(harness, model, undefined, input.reasoningEffort);
@@ -83,6 +85,8 @@ export async function resolveHarnessSelection(
     harness: HarnessId;
     model?: string | null;
     reasoningEffort?: string | null;
+    /** From `resolveDefaultModel`; what a legacy harness runs when `model` names none. */
+    defaultModel: ValidModel;
   },
   enabledModels?: readonly ValidModel[]
 ): Promise<{ model: ValidModel; reasoningEffort: ReasoningEffort | null }> {
@@ -90,7 +94,7 @@ export async function resolveHarnessSelection(
     // Only an explicit model is checked; an omitted one keeps the installation default.
     const model =
       input.model == null
-        ? getValidModelOrDefault(input.model)
+        ? getValidModelOrDefault(input.model, input.defaultModel)
         : await resolveRequestedModel(db, input.harness, input.model, enabledModels);
     const incompatible = checkHarnessCompatibility(input.harness, model);
     if (incompatible) throw new HarnessAdmissionError(incompatible.message);
@@ -138,7 +142,8 @@ export async function validateHarnessExecution(
   providerAuthModes?: Readonly<Partial<Record<string, SessionProviderAuthMode>>>
 ): Promise<void> {
   if (getHarnessCapabilities(input.harness).selectionPolicy === "legacy_fallback") return;
-  await resolveHarnessSelection(db, input);
+  // Strict harnesses never substitute a default, so the catalog's stands in unused.
+  await resolveHarnessSelection(db, { ...input, defaultModel: CATALOG_DEFAULT_MODEL });
   const incompatible = checkHarnessCompatibility(
     input.harness,
     input.model,
@@ -185,14 +190,15 @@ export async function resolveChildHarnessSelection(
   db: SqlDatabase,
   parent: { harness: HarnessId; model: string; reasoningEffort: string | null },
   requested: { model?: string; reasoningEffort?: string },
-  enabledModels: ValidModel[]
+  enabledModels: ValidModel[],
+  defaultModel: ValidModel
 ): Promise<{ model: ValidModel; reasoningEffort: ReasoningEffort | null }> {
   const strict = getHarnessCapabilities(parent.harness).selectionPolicy === "strict";
-  const inheritedModel = getValidModelOrDefault(requested.model ?? parent.model);
+  const inheritedModel = getValidModelOrDefault(requested.model ?? parent.model, defaultModel);
   const compatible = strict ? filterModelsForHarness(parent.harness, enabledModels) : enabledModels;
   const model = strict
     ? (requested.model ?? compatible.find((model) => model === inheritedModel) ?? compatible[0])
-    : resolveEnabledModel({ model: inheritedModel, enabledModels });
+    : resolveEnabledModel({ model: inheritedModel, enabledModels, fallbackModel: defaultModel });
   const inheritedEffort = model
     ? inheritReasoningEffort(parent.harness, model, parent.reasoningEffort)
     : undefined;
@@ -215,6 +221,7 @@ export async function resolveChildHarnessSelection(
       harness: parent.harness,
       model,
       reasoningEffort: requested.reasoningEffort ?? inheritedEffort,
+      defaultModel,
     },
     enabledModels
   );
@@ -229,10 +236,13 @@ export async function resolveHarnessAutomationUpdate(
     model?: string;
     reasoningEffort?: string | null;
     executionChanged: boolean;
+    defaultModel: ValidModel;
   }
 ): Promise<{ model: string; reasoningEffort: string | null }> {
   const model =
-    input.model === undefined ? existing.model : resolveHarnessModel(input.harness, input.model);
+    input.model === undefined
+      ? existing.model
+      : resolveHarnessModel(input.harness, input.model, input.defaultModel);
   if (getHarnessCapabilities(input.harness).selectionPolicy === "strict" && input.executionChanged)
     return resolveHarnessSelection(db, {
       harness: input.harness,
@@ -241,6 +251,7 @@ export async function resolveHarnessAutomationUpdate(
         input.reasoningEffort !== undefined
           ? input.reasoningEffort
           : inheritReasoningEffort(input.harness, model, existing.reasoningEffort),
+      defaultModel: input.defaultModel,
     });
   if (!input.executionChanged) return { model, reasoningEffort: existing.reasoningEffort };
   const effort =

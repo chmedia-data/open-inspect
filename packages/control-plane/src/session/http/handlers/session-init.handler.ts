@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Logger } from "../../../logger";
 import type { RepositoryRef } from "@open-inspect/shared/types/repositories";
 import { getValidHarnessOrDefault, harnessIdSchema } from "@open-inspect/shared/harnesses";
-import { isValidModel } from "@open-inspect/shared/models";
+import { isValidModel, type ValidModel } from "@open-inspect/shared/models";
 import { HarnessAdmissionError, resolveHarnessInitialization } from "../../../harness-admission";
 import type { SpawnSource } from "@open-inspect/shared/types/sessions";
 import { normalizeSandboxSettings } from "../../../sandbox/settings";
@@ -98,6 +98,7 @@ export class SessionInitHandler {
     private readonly durableObjectId: string,
     private readonly scheduleWarmSandbox: () => void,
     private readonly generateId: (bytes?: number) => string,
+    private readonly defaultModel: ValidModel,
     private readonly now: () => number = Date.now
   ) {}
 
@@ -144,7 +145,7 @@ export class SessionInitHandler {
     const harness = getValidHarnessOrDefault(body.harness);
     let selection;
     try {
-      selection = resolveHarnessInitialization(harness, body);
+      selection = resolveHarnessInitialization(harness, body, this.defaultModel);
     } catch (cause) {
       if (cause instanceof HarnessAdmissionError)
         return Response.json({ error: cause.message }, { status: cause.status });

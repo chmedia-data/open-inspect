@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   MODEL_OPTIONS,
   DEFAULT_ENABLED_MODELS,
+  getValidModelOrDefault,
   applyModelPreferenceChanges,
   isValidModel,
   normalizeModelId,
@@ -25,6 +26,8 @@ const canonicalModelSchema = z.custom<ValidModel>(
 const modelPreferencesSchema = z.object({
   enabledModels: z.array(canonicalModelSchema).nonempty(),
   revision: z.number().int().nonnegative(),
+  // The deployment's default model; absent from control planes that predate it.
+  defaultModel: canonicalModelSchema.optional(),
 });
 type ModelPreferencesResponse = z.infer<typeof modelPreferencesSchema>;
 
@@ -35,6 +38,8 @@ function responseError(body: unknown): string | null {
 
 export function useEnabledModels(): {
   enabledModels: string[];
+  /** What the control plane runs when no model is named; the catalog default until loaded. */
+  defaultModel: ValidModel;
   enabledModelOptions: ModelCategory[];
   loading: boolean;
   error: unknown;
@@ -87,6 +92,7 @@ export function useEnabledModels(): {
             optimisticData: {
               enabledModels: next,
               revision: data?.revision ?? INITIAL_MODEL_PREFERENCES_REVISION,
+              defaultModel: data?.defaultModel,
             },
             rollbackOnError: true,
             populateCache: (result, current) =>
@@ -101,11 +107,12 @@ export function useEnabledModels(): {
         setActiveWrites((current) => current - 1);
       }
     },
-    [data?.revision, enabledModels, error, isLoading, mutate]
+    [data?.defaultModel, data?.revision, enabledModels, error, isLoading, mutate]
   );
 
   return {
     enabledModels,
+    defaultModel: getValidModelOrDefault(data?.defaultModel),
     enabledModelOptions,
     loading: isLoading,
     error,

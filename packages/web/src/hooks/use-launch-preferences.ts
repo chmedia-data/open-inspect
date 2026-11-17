@@ -9,7 +9,6 @@ import {
   type HarnessId,
 } from "@open-inspect/shared/harnesses";
 import {
-  DEFAULT_MODEL,
   type ModelCategory,
   type ReasoningEffort,
   type ValidModel,
@@ -64,6 +63,8 @@ const browserStorage: LaunchPreferenceStorage = {
 export interface LaunchPreferencesInput {
   models: {
     enabledModels: readonly string[];
+    /** The deployment default: what a user with no remembered model starts on. */
+    defaultModel?: ValidModel;
     enabledModelOptions: ModelCategory[];
     loading: boolean;
   };
@@ -77,11 +78,14 @@ export function useLaunchPreferences(
   { models, providerAccounts }: LaunchPreferencesInput,
   storage: LaunchPreferenceStorage = browserStorage
 ) {
-  const { enabledModels, enabledModelOptions, loading: loadingEnabledModels } = models;
-  const [storedPreference, setStoredPreference] = useState<ModelPreference>({
-    model: DEFAULT_MODEL,
-    reasoningEffort: getHarnessReasoningConfig(DEFAULT_HARNESS, DEFAULT_MODEL)?.default,
-  });
+  const {
+    enabledModels,
+    defaultModel,
+    enabledModelOptions,
+    loading: loadingEnabledModels,
+  } = models;
+  // No model until storage is read: an empty preference resolves to the deployment default.
+  const [storedPreference, setStoredPreference] = useState<ModelPreference>({});
   const [modelPreferenceDraft, setModelPreferenceDraft] = useState<ModelPreference | null>(null);
   const [harness, setHarness] = useState<HarnessId>(DEFAULT_HARNESS);
   const [providerSelections, setProviderSelections] = useState<ModelProviderSelections>({});
@@ -122,7 +126,7 @@ export function useLaunchPreferences(
       }
     }
     setStoredPreference({
-      model: storedModel ?? DEFAULT_MODEL,
+      model: storedModel ?? undefined,
       reasoningEffort: storedReasoningEffort ?? undefined,
     });
     setHarness(getValidHarnessOrDefault(storage.getItem(LAST_SELECTED_HARNESS_STORAGE_KEY)));
@@ -169,8 +173,10 @@ export function useLaunchPreferences(
         enabledModels,
         enabledModelOptions,
         loading: loadingEnabledModels,
+        defaultModel,
       }),
     [
+      defaultModel,
       enabledModelOptions,
       enabledModels,
       harness,
@@ -183,7 +189,7 @@ export function useLaunchPreferences(
   const harnessHasModels = modelSelection.availability.status !== "unavailable";
   const providerReady = providerSelectionsHydrated && !providerAccounts.loading;
 
-  function saveModelPreferenceDraft(preference: ModelPreference) {
+  function saveModelPreferenceDraft(preference: { model: ValidModel; reasoningEffort?: string }) {
     setModelPreferenceDraft(preference);
     storage.setItem(LAST_SELECTED_MODEL_STORAGE_KEY, preference.model);
     if (preference.reasoningEffort) {
