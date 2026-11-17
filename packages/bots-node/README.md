@@ -4,14 +4,14 @@ Serves one of the bot Workers (`packages/github-bot`, `packages/slack-bot`, `pac
 as a Node process, with the Cloudflare bindings it uses replaced by local equivalents. Deployment,
 routes and configuration are in [docs/BOTS_NODE.md](../../docs/BOTS_NODE.md).
 
-| File                          | What it does                                                                |
-| ----------------------------- | --------------------------------------------------------------------------- |
-| `src/bots.ts`                 | Each bot once: its Worker, KV binding, queues, webhook routes, required env |
-| `src/ingress.ts`              | The webhook gate: header precheck, bounded read, HMAC, tenant, replay       |
-| `src/store.ts`                | SQLite: the KV namespace, the replay ledger and the bot's own queue         |
-| `src/host.ts`                 | The two listeners, bindings, `waitUntil`, queue consumer, shutdown          |
-| `src/main.ts`                 | Process entry (`BOT=...`), signals, and the `kv` operator command           |
-| `types/workers-bindings.d.ts` | The binding surface this host implements, which the bots typecheck against  |
+| File                          | What it does                                                               |
+| ----------------------------- | -------------------------------------------------------------------------- |
+| `src/bots.ts`                 | Each bot once: its Worker, KV, queues, webhook and internal routes, env    |
+| `src/ingress.ts`              | The webhook gate: header precheck, bounded read, HMAC, tenant, replay      |
+| `src/store.ts`                | SQLite: the KV namespace, the replay ledger and the bot's own queue        |
+| `src/host.ts`                 | The two listeners, bindings, `waitUntil`, queue consumer, shutdown         |
+| `src/main.ts`                 | Process entry (`BOT=...`), signals, and the `kv` operator command          |
+| `types/workers-bindings.d.ts` | The binding surface this host implements, which the bots typecheck against |
 
 The bots are bundled from source unchanged. `npm run typecheck` checks them against
 `types/workers-bindings.d.ts` rather than workers-types, so a bot that starts using a Workers API
