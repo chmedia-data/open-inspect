@@ -77,6 +77,8 @@ function parseMessageStatus(value: unknown): MessageStatus | null {
 export interface CreateMessageData {
   admittedCanonicalUserId?: string | null;
   mcpEligible?: boolean;
+  /** The token a token prompt was admitted under, never the token itself; null otherwise. */
+  admittedPersonalAccessTokenId?: string | null;
   id: string;
   authorId: string;
   /**
@@ -381,8 +383,8 @@ export class MessageRepository {
          id, author_id, author_canonical_user_id, content, source, model, reasoning_effort,
          attachments, callback_context, client_request_id, request_fingerprint,
          autofix_feedback_key, autofix_pr_key, origin_context, status, created_at,
-         admitted_canonical_user_id, mcp_eligible
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         admitted_canonical_user_id, mcp_eligible, admitted_personal_access_token_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       data.id,
       data.authorId,
       data.authorCanonicalUserId ?? null,
@@ -400,7 +402,8 @@ export class MessageRepository {
       data.status,
       data.createdAt,
       data.admittedCanonicalUserId ?? null,
-      data.mcpEligible ? 1 : 0
+      data.mcpEligible ? 1 : 0,
+      data.admittedPersonalAccessTokenId ?? null
     );
   }
 
@@ -536,15 +539,28 @@ export class MessageRepository {
     return rows[0] ?? null;
   }
 
-  getProcessingMessageAuthority(): { canonicalUserId: string | null; mcpEligible: boolean } | null {
+  getProcessingMessageAuthority(): {
+    canonicalUserId: string | null;
+    mcpEligible: boolean;
+    personalAccessTokenId: string | null;
+  } | null {
     const row = this.sql
       .exec(
-        "SELECT admitted_canonical_user_id, mcp_eligible FROM messages WHERE status = 'processing' LIMIT 1"
+        "SELECT admitted_canonical_user_id, mcp_eligible, admitted_personal_access_token_id FROM messages WHERE status = 'processing' LIMIT 1"
       )
       .toArray()[0] as
-      { admitted_canonical_user_id: string | null; mcp_eligible: number } | undefined;
+      | {
+          admitted_canonical_user_id: string | null;
+          mcp_eligible: number;
+          admitted_personal_access_token_id: string | null;
+        }
+      | undefined;
     return row
-      ? { canonicalUserId: row.admitted_canonical_user_id, mcpEligible: row.mcp_eligible === 1 }
+      ? {
+          canonicalUserId: row.admitted_canonical_user_id,
+          mcpEligible: row.mcp_eligible === 1,
+          personalAccessTokenId: row.admitted_personal_access_token_id,
+        }
       : null;
   }
 

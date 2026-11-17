@@ -811,6 +811,11 @@ export const MIGRATIONS: readonly SchemaMigration[] = [
     description: "Pin the session's MCP server selection",
     run: "ALTER TABLE session ADD COLUMN mcp_selection TEXT",
   },
+  {
+    id: 61,
+    description: "Retain the personal access token a prompt was admitted under",
+    run: "ALTER TABLE messages ADD COLUMN admitted_personal_access_token_id TEXT",
+  },
 ];
 
 function removePersistedHookOutputTails(sql: SqlStorage): void {

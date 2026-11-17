@@ -377,15 +377,30 @@ export class PersonalAccessTokenStore {
    * caller decides, so both outcomes stay visible to it.
    */
   async findByToken(token: string): Promise<PersonalAccessTokenCredential | null> {
+    return this.findCredential("token.token_hash", await hashToken(token));
+  }
+
+  /**
+   * Resolves a token by id, with its grant, for work admitted under it that is checked again
+   * later. Expiry is not filtered here either.
+   */
+  async findById(tokenId: string): Promise<PersonalAccessTokenCredential | null> {
+    return this.findCredential("token.id", tokenId);
+  }
+
+  private async findCredential(
+    column: "token.token_hash" | "token.id",
+    value: string
+  ): Promise<PersonalAccessTokenCredential | null> {
     const { results } = await this.db
       .prepare(
         `SELECT token.id, token.user_id, token.display_prefix, token.created_at, token.expires_at,
                 grant_row.permission_id
            FROM personal_access_tokens token
            LEFT JOIN personal_access_token_permissions grant_row ON grant_row.token_id = token.id
-          WHERE token.token_hash = ?`
+          WHERE ${column} = ?`
       )
-      .bind(await hashToken(token))
+      .bind(value)
       .all<{
         id: string;
         user_id: string;

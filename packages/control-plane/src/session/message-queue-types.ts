@@ -14,6 +14,7 @@ export interface PromptMessageData {
 export interface EnqueuePromptCoreData {
   admittedCanonicalUserId?: string | null;
   mcpEligible?: boolean;
+  admittedPersonalAccessTokenId?: string | null;
   participant: ParticipantRow;
   /** Recorded as the prompt's account in place of the participant's when set, null included. */
   promptAccountUserId?: string | null;

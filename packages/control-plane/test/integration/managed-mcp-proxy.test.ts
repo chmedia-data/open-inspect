@@ -17,6 +17,7 @@ import { McpServerStore } from "../../src/db/mcp-servers";
 import { McpConnectionStore, connectionBinding } from "../../src/db/mcp-connections";
 import { McpOAuthService } from "../../src/mcp/oauth";
 import { SessionInternalPaths } from "../../src/session/contracts";
+import { PersonalAccessTokenStore } from "../../src/db/personal-access-tokens";
 const alice = "11111111111111111111111111111111";
 const bob = "22222222222222222222222222222222";
 const token = "test-current-sandbox";
@@ -275,6 +276,118 @@ describe("managed MCP actual sandbox route + session authority", () => {
       expect(JSON.parse(String(row.mcp_context))).toMatchObject({ bindings: [] });
     });
   });
+  it("stops a token's admitted personal MCP work once the token can no longer delegate", async () => {
+    const f = await fixture();
+    const tokens = new PersonalAccessTokenStore(env.DB);
+    const issued = await tokens.issue({
+      userId: alice,
+      name: "agent",
+      permissions: ["sessions.collaborate", "mcp_connections.use"],
+      expiresAt: Date.now() + 60 * 60 * 1000,
+      now: Date.now(),
+      requestId: "integration",
+    });
+    if (issued.kind !== "issued") throw new Error("token was not issued");
+    const tokenId = issued.token.id;
+    await queryDO(
+      f.stub,
+      "UPDATE messages SET admitted_personal_access_token_id = ? WHERE id = 'alice-message'",
+      tokenId
+    );
+    const prepare = () =>
+      runInSessionDO(f.stub, (instance, state) =>
+        new SessionMcpContext(
+          state.storage.sql,
+          env.DB,
+          (instance as unknown as SessionDOInternals).appEnv,
+          new SessionCoreRepository(state.storage.sql, (run) => state.storage.transactionSync(run)),
+          componentsOf(instance).sandboxRepository
+        ).prepare("alice-message")
+      );
+    const initialize = () => f.proxy({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
+    // A refused turn records no bindings, so an allowed check prepares before it relays, and a
+    // refused one relays first, while the turn still holds the binding it prepared.
+    const allowed = async () => {
+      expect(await prepare()).toMatchObject({ servers: ["example"], unavailable: [] });
+      expect((await initialize()).status).toBe(200);
+    };
+    const refused = async () => {
+      expect((await initialize()).status).toBe(403);
+      expect(await prepare()).toMatchObject({
+        servers: [],
+        unavailable: [{ name: "example", code: "mcp_denied" }],
+      });
+    };
+    const d1 = (sql: string, ...values: unknown[]) =>
+      env.DB.prepare(sql)
+        .bind(...values)
+        .run();
+
+    // The snapshot a sandbox captured carries the token, so the relay rechecks it too.
+    const captured = await f.context({});
+    expect(await captured.json()).toMatchObject({ personalAccessTokenId: tokenId });
+    await allowed();
+
+    await d1(
+      "DELETE FROM personal_access_token_permissions WHERE token_id = ? AND permission_id = 'mcp_connections.use'",
+      tokenId
+    );
+    await refused();
+    await d1(
+      "INSERT INTO personal_access_token_permissions (token_id, permission_id) VALUES (?, 'mcp_connections.use')",
+      tokenId
+    );
+    await allowed();
+
+    await d1("UPDATE workspace_personal_access_token_policy SET allowed_permissions_json = '[]'");
+    await refused();
+    await d1("UPDATE workspace_personal_access_token_policy SET allowed_permissions_json = NULL");
+    await d1("UPDATE workspace_personal_access_token_policy SET enabled = 0");
+    await refused();
+    await d1("UPDATE workspace_personal_access_token_policy SET enabled = 1");
+    await allowed();
+
+    const role = await env.DB.prepare("SELECT role_id FROM user_role_assignments WHERE user_id = ?")
+      .bind(alice)
+      .first<{ role_id: string }>();
+    await d1(
+      "UPDATE user_role_assignments SET role_id = (SELECT id FROM roles WHERE key = 'viewer') WHERE user_id = ?",
+      alice
+    );
+    await refused();
+    await d1(
+      "UPDATE user_role_assignments SET role_id = ? WHERE user_id = ?",
+      role!.role_id,
+      alice
+    );
+    await allowed();
+
+    await d1(
+      "UPDATE personal_access_tokens SET expires_at = ? WHERE id = ?",
+      Date.now() - 1,
+      tokenId
+    );
+    await refused();
+    await d1(
+      "UPDATE personal_access_tokens SET expires_at = ? WHERE id = ?",
+      Date.now() + 60 * 60 * 1000,
+      tokenId
+    );
+    await allowed();
+
+    // Revoked while the prompt waits in the queue: once it starts, it gets no personal servers.
+    await queryDO(f.stub, "UPDATE messages SET status = 'pending' WHERE id = 'alice-message'");
+    await tokens.revoke({
+      userId: alice,
+      tokenId,
+      actorUserId: alice,
+      now: Date.now(),
+      requestId: "integration",
+    });
+    await queryDO(f.stub, "UPDATE messages SET status = 'processing' WHERE id = 'alice-message'");
+    await refused();
+  });
+
   it("withholds personal servers a launch cannot run and explains them per prompt", async () => {
     const f = await fixture();
     const routed = {

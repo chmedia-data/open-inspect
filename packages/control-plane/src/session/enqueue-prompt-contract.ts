@@ -13,6 +13,11 @@ export const enqueuePromptRequestSchema = z
     content: promptContentSchema,
     authorId: z.string(),
     mcpEligible: z.boolean().optional(),
+    /**
+     * The personal access token the prompt was admitted under, or that admitted the prompt it
+     * descends from. Personal MCP use is checked against it again on every turn and call.
+     */
+    personalAccessTokenId: z.string().optional(),
     canonicalUserId: z.string().nullable().optional(),
     /**
      * The account the prompt counts as when it isn't the author participant's: a prompt one session

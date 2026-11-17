@@ -12,6 +12,7 @@ import { McpOAuthService } from "../mcp/oauth";
 import { relayMcpRequest, readMcpBody } from "../mcp/relay";
 import { McpError, mcpErrorResponse, type McpErrorCode } from "../mcp/errors";
 import { assertMcpUserAccess } from "../mcp/authorization";
+import { assertPersonalAccessTokenDelegation } from "../mcp/personal-access-token-delegation";
 import { createLogger } from "../logger";
 
 const log = createLogger("mcp-proxy");
@@ -75,6 +76,12 @@ async function proxy(
         throw new McpError("mcp_denied");
       if (snapshot.grant) {
         await assertMcpUserAccess(ctx.db, env, snapshot.grant.canonicalUserId, params.id);
+        if (snapshot.personalAccessTokenId)
+          await assertPersonalAccessTokenDelegation(
+            ctx.db,
+            snapshot.personalAccessTokenId,
+            snapshot.grant.canonicalUserId
+          );
         const row = await connections.require(snapshot.grant);
         if (row.issuer !== server.oauth?.issuer || row.resource !== server.oauth?.resource)
           throw new McpError("mcp_context_changed", 409);

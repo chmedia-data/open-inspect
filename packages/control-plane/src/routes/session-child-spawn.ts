@@ -374,6 +374,10 @@ export async function handleSpawnChild(
       ...(spawnContext.promptAuthor.mcpEligible && ctx.principal?.kind === "sandbox"
         ? { mcpEligible: true }
         : {}),
+      // A token's work stays bound to that token in every descendant.
+      ...(spawnContext.promptAuthor.personalAccessTokenId
+        ? { personalAccessTokenId: spawnContext.promptAuthor.personalAccessTokenId }
+        : {}),
       promptAccountUserId,
       source: "agent",
     } satisfies EnqueuePromptRequest;
