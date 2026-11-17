@@ -124,8 +124,8 @@ export class SqliteKv {
   }
 }
 
-/** What a replay claim found: the identity is new, or the binding it was first seen with. */
-export type ReplayClaim = { fresh: true } | { fresh: false; binding: string };
+/** What a replay claim found: the identity is new, or the binding and time it was first seen with. */
+export type ReplayClaim = { fresh: true } | { fresh: false; binding: string; firstSeenAt: number };
 
 /**
  * Authenticated request identities the ingress has accepted. A claim is one
@@ -146,17 +146,15 @@ export class ReplayLedger {
           "INSERT INTO replay (identity, binding, expires_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING"
         )
         .run(identity, binding, now + ttlMs);
-      const claim: ReplayClaim =
-        inserted.changes === 1
-          ? { fresh: true }
-          : {
-              fresh: false,
-              binding: (
-                db.prepare("SELECT binding FROM replay WHERE identity = ?").get(identity) as {
-                  binding: string;
-                }
-              ).binding,
-            };
+      let claim: ReplayClaim = { fresh: true };
+      if (inserted.changes !== 1) {
+        const row = db
+          .prepare("SELECT binding, expires_at FROM replay WHERE identity = ?")
+          .get(identity) as { binding: string; expires_at: number };
+        // A row is written once, at its first sighting, and never extended; each identity is
+        // always claimed with the same TTL, so the first sighting is its expiry minus that TTL.
+        claim = { fresh: false, binding: row.binding, firstSeenAt: row.expires_at - ttlMs };
+      }
       db.exec("COMMIT");
       return claim;
     } catch (error) {

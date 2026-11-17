@@ -56,9 +56,11 @@ Before a bot sees a webhook, the host:
    `LINEAR_ALLOWED_ORGANIZATION_IDS`; Linear's signed `webhookTimestamp` must be within five
    minutes;
 5. records the request's signature in a durable replay ledger. A Slack or Linear request seen before
-   is refused. A GitHub body seen before is accepted only under its original `X-GitHub-Delivery` (a
-   manual redelivery from GitHub, which the bot deduplicates); under any other delivery id it is
-   refused. When the bot fails a Slack or Linear request (an error, or a 5xx answer), its record is
+   is refused. A GitHub body seen before is accepted only under its original `X-GitHub-Delivery` and
+   only within three days of its first sighting, GitHub's redelivery window (a manual redelivery,
+   which the bot deduplicates). Under any other delivery id, or later, it is refused. GitHub signs
+   no timestamp, so its records are kept for 90 days, after which a captured delivery would verify
+   as new. When the bot fails a Slack or Linear request (an error, or a 5xx answer), its record is
    dropped, so the provider's retry of the same signed request gets through.
 
 GitHub never retries a delivery on its own. Three paths answer it 503 and lose the event until

@@ -8,6 +8,8 @@ import {
   createIngressGate,
   DEFAULT_INGRESS_LIMITS,
   GITHUB_INGRESS,
+  GITHUB_REDELIVERY_WINDOW_MS,
+  GITHUB_REPLAY_TTL_MS,
   LINEAR_INGRESS,
   SLACK_INGRESS,
   type IngressLimits,
@@ -27,14 +29,15 @@ const ENV = {
 
 function setup(routes: readonly WebhookIngress[], limits: Partial<IngressLimits> = {}) {
   const dir = mkdtempSync(join(tmpdir(), "bots-node-ingress-"));
-  const ledger = new ReplayLedger(openBotDatabase(dir, () => NOW));
+  const clock = { now: NOW };
+  const ledger = new ReplayLedger(openBotDatabase(dir, () => clock.now));
   const gate = createIngressGate({
     routes,
     env: ENV,
     ledger,
     limits: { ...DEFAULT_INGRESS_LIMITS, ...limits },
     log: createLogger("test", {}, "error"),
-    now: () => NOW,
+    now: () => clock.now,
   });
   const forwarded: { text: string; headers: Headers }[] = [];
   const forward = vi.fn(async (request: Request) => {
@@ -46,7 +49,7 @@ function setup(routes: readonly WebhookIngress[], limits: Partial<IngressLimits>
     if (!route) throw new Error("no route");
     return gate.handle(route, request, forward);
   };
-  return { send, forward, forwarded, gate };
+  return { send, forward, forwarded, gate, clock };
 }
 
 async function githubRequest(
@@ -223,6 +226,27 @@ describe("GitHub ingress", () => {
     expect((await send(await githubRequest(githubPayload))).status).toBe(200);
     expect((await send(await githubRequest(githubPayload))).status).toBe(200);
     expect(forward).toHaveBeenCalledTimes(2);
+  });
+
+  it("accepts a same-id repeat only within GitHub's redelivery window", async () => {
+    const { send, forward, clock } = setup([GITHUB_INGRESS]);
+    expect((await send(await githubRequest(githubPayload))).status).toBe(200);
+    clock.now = NOW + GITHUB_REDELIVERY_WINDOW_MS - 1;
+    expect((await send(await githubRequest(githubPayload))).status).toBe(200);
+    clock.now = NOW + GITHUB_REDELIVERY_WINDOW_MS;
+    expect((await send(await githubRequest(githubPayload))).status).toBe(409);
+    expect(forward).toHaveBeenCalledTimes(2);
+  });
+
+  it("remembers a delivery until the replay TTL, then treats it as new", async () => {
+    expect(GITHUB_REDELIVERY_WINDOW_MS).toBe(3 * 24 * 60 * 60 * 1000);
+    expect(GITHUB_REPLAY_TTL_MS).toBe(90 * 24 * 60 * 60 * 1000);
+    const { send, clock } = setup([GITHUB_INGRESS]);
+    expect((await send(await githubRequest(githubPayload))).status).toBe(200);
+    clock.now = NOW + GITHUB_REPLAY_TTL_MS - 1;
+    expect((await send(await githubRequest(githubPayload))).status).toBe(409);
+    clock.now = NOW + GITHUB_REPLAY_TTL_MS;
+    expect((await send(await githubRequest(githubPayload))).status).toBe(200);
   });
 
   it("refuses a captured body replayed under a new delivery id", async () => {

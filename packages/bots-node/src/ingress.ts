@@ -52,15 +52,16 @@ export interface WebhookIngress {
   admit(request: VerifiedWebhook): string | null;
   /**
    * The request's authenticated identity, and the unsigned value it must
-   * stay bound to. A repeat with the same binding is let through when
-   * `allowRepeat` is set (a provider's own redelivery); any other repeat is
-   * a replay.
+   * stay bound to. A repeat with the same binding is let through within
+   * `repeatWindowMs` of the first sighting (a provider's own redelivery);
+   * any other repeat is a replay. 0 refuses every repeat.
    */
   replay(request: VerifiedWebhook): {
     identity: string;
     binding: string;
+    /** How long the identity is remembered; at least `repeatWindowMs`. */
     ttlMs: number;
-    allowRepeat: boolean;
+    repeatWindowMs: number;
   };
 }
 
@@ -83,8 +84,17 @@ const SLACK_MAX_SKEW_MS = 5 * 60 * 1000;
 const LINEAR_MAX_SKEW_MS = 5 * 60 * 1000;
 /** Longer than any window above, so a replay is caught for as long as it would verify. */
 const SIGNED_TIMESTAMP_REPLAY_TTL_MS = 2 * SLACK_MAX_SKEW_MS;
-/** As long as the GitHub bot remembers a delivery. */
-const GITHUB_REPLAY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * How long a GitHub delivery is remembered. GitHub signs no timestamp, so a captured
+ * delivery verifies forever; past this it would be fresh again.
+ */
+export const GITHUB_REPLAY_TTL_MS = 90 * DAY_MS;
+/**
+ * How long after its first sighting a GitHub delivery may arrive again under the same
+ * delivery id: GitHub's own window for redelivering a delivery. Later, it is a replay.
+ */
+export const GITHUB_REDELIVERY_WINDOW_MS = 3 * DAY_MS;
 
 /** Comma-separated identities; empty entries are ignored. */
 function parseIdList(value: string | undefined): Set<string> {
@@ -151,7 +161,7 @@ export const GITHUB_INGRESS: WebhookIngress = {
       // GitHub redelivers with the same delivery id; the same body under another id is a replay.
       binding: headers.get("x-github-delivery") ?? "",
       ttlMs: GITHUB_REPLAY_TTL_MS,
-      allowRepeat: true,
+      repeatWindowMs: GITHUB_REDELIVERY_WINDOW_MS,
     };
   },
 };
@@ -200,7 +210,7 @@ function slackIngress(path: "/events" | "/interactions"): WebhookIngress {
         identity: `slack:${headers.get("x-slack-signature")}`,
         binding: "",
         ttlMs: SIGNED_TIMESTAMP_REPLAY_TTL_MS,
-        allowRepeat: false,
+        repeatWindowMs: 0,
       };
     },
   };
@@ -247,7 +257,7 @@ export const LINEAR_INGRESS: WebhookIngress = {
       identity: `linear:${headers.get("linear-signature")}`,
       binding: "",
       ttlMs: SIGNED_TIMESTAMP_REPLAY_TTL_MS,
-      allowRepeat: false,
+      repeatWindowMs: 0,
     };
   },
 };
@@ -356,7 +366,11 @@ export function createIngressGate(options: {
 
       const replay = route.replay(verified);
       const claim = options.ledger.claim(replay.identity, replay.binding, replay.ttlMs);
-      if (!claim.fresh && !(replay.allowRepeat && claim.binding === replay.binding)) {
+      const redelivery =
+        !claim.fresh &&
+        claim.binding === replay.binding &&
+        verified.nowMs - claim.firstSeenAt < replay.repeatWindowMs;
+      if (!claim.fresh && !redelivery) {
         return refuse(route, { status: 409, reason: "replayed_request" });
       }
       if (inFlight.has(replay.identity)) {
@@ -367,7 +381,7 @@ export function createIngressGate(options: {
       // A refused repeat can only be the provider's retry if the first attempt failed, so a
       // failed attempt gives its claim back; it had no effect a replay could repeat.
       const release = () => {
-        if (!replay.allowRepeat) options.ledger.release(replay.identity);
+        if (replay.repeatWindowMs === 0) options.ledger.release(replay.identity);
       };
       try {
         const response = await forward(

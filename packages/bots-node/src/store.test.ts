@@ -83,13 +83,18 @@ describe("SqliteKv", () => {
 });
 
 describe("ReplayLedger", () => {
-  it("is fresh once, then reports the binding it was first claimed with", () => {
-    const { db } = setup();
+  it("is fresh once, then reports the binding and time it was first claimed with", () => {
+    const setupClock = setup();
+    const { db } = setupClock;
     const ledger = new ReplayLedger(db);
+    const { clock } = setupClock;
+    const first = clock.now;
     expect(ledger.claim("id", "delivery-1", 60_000)).toEqual({ fresh: true });
+    clock.now += 10_000;
     expect(ledger.claim("id", "delivery-2", 60_000)).toEqual({
       fresh: false,
       binding: "delivery-1",
+      firstSeenAt: first,
     });
   });
 
