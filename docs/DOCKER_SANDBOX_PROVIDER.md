@@ -152,6 +152,7 @@ with Docker's data root, as in the Compose stack.
 | `DOCKER_SANDBOX_MIN_FREE_DISK_PERCENT` | `10`           | Free space on the `DATA_DIR` filesystem required to start |
 | `DOCKER_SANDBOX_STOPPED_RETENTION_MS`  | 14 days        | How long a stopped sandbox stays resumable                |
 | `DOCKER_SANDBOX_RUNTIME`               | daemon default | OCI runtime, for example `runsc`                          |
+| `DOCKER_SANDBOX_DNS`                   | unset          | Comma-separated IPv4 resolvers for sandboxes              |
 
 The defaults fit a 2 vCPU, 8 GiB host such as an AWS `t3a.large`: three 2 GiB sandboxes leave about
 2 GiB for the control plane, Docker and the operating system. A sandbox that exceeds its memory is
@@ -161,6 +162,15 @@ The writable container layer has no size quota. Docker supports one only on `ove
 project quotas, which this provider does not assume. Put Docker's data root on a separate volume
 from the control plane's database, or rely on the disk watermark, which refuses new starts but does
 not stop a running sandbox from filling the disk.
+
+### DNS
+
+Unset, sandboxes use Docker's embedded resolver, which resolves any name through the host. Set
+`DOCKER_SANDBOX_DNS` to the address of an allowlisting resolver on the sandbox bridge (for example
+dnsmasq on the bridge gateway) to close DNS exfiltration and to make sandboxes and an egress proxy
+that verifies the Host header resolve rotating hosts such as `github.com` through the same resolver.
+The value is applied to every sandbox container at creation; a resumed sandbox keeps the value it
+was created with.
 
 ### gVisor
 

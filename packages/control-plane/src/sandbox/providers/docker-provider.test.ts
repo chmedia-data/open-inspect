@@ -222,6 +222,7 @@ describe("DockerSandboxProvider", () => {
     expect(hostConfig.CapAdd).not.toContain("NET_RAW");
     expect(hostConfig.CapAdd).not.toContain("NET_ADMIN");
     expect(body.HostConfig).not.toHaveProperty("Runtime");
+    expect(body.HostConfig).not.toHaveProperty("Dns");
     expect(body.HostConfig).not.toHaveProperty("Privileged");
     expect(admit).toHaveBeenCalledTimes(1);
     expect(body.HostConfig).not.toHaveProperty("Binds");
@@ -292,6 +293,27 @@ describe("DockerSandboxProvider", () => {
       vncAccess: result.vncAccess,
       tunnelUrls: result.tunnelUrls,
     });
+  });
+
+  it("passes the configured resolvers to the container", async () => {
+    const withDns = new DockerSandboxProvider(
+      { request },
+      {
+        image: "local",
+        network: "local",
+        deploymentName: "local",
+        scmProvider: "github",
+        portal: resolveDockerPortalConfig({}),
+        sandboxAccessPasswordSecret: "secret",
+        limits: resolveDockerSandboxLimits({ DOCKER_SANDBOX_DNS: "172.20.0.1" }),
+        admission,
+      }
+    );
+    request.mockResolvedValueOnce({ status: 201, body: { Id: "container-1" } });
+    request.mockResolvedValueOnce({ status: 204, body: null });
+    await withDns.createSandbox(config);
+    const body = request.mock.calls[0][2] as { HostConfig: { Dns: string[] } };
+    expect(body.HostConfig.Dns).toEqual(["172.20.0.1"]);
   });
 
   it("uses the lifecycle callback URL when no Docker override is configured", async () => {
