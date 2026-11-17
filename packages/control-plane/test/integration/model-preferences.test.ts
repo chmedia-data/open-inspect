@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:test";
-import { DEFAULT_ENABLED_MODELS } from "@open-inspect/shared/models";
+import { DEFAULT_ENABLED_MODELS, DEFAULT_MODEL } from "@open-inspect/shared/models";
 import { cleanD1Tables } from "./cleanup";
 import { serviceFetch } from "./helpers";
 
@@ -55,7 +55,11 @@ describe("Model preferences API", () => {
     const response = await serviceFetch("https://test.local/model-preferences");
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ enabledModels: DEFAULT_ENABLED_MODELS, revision: 0 });
+    expect(await response.json()).toEqual({
+      enabledModels: DEFAULT_ENABLED_MODELS,
+      revision: 0,
+      defaultModel: DEFAULT_MODEL,
+    });
   });
 
   it("returns an authoritative snapshot for strict reads", async () => {
@@ -64,7 +68,11 @@ describe("Model preferences API", () => {
     const response = await serviceFetch("https://test.local/model-preferences?strict=true");
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ enabledModels: ["openai/gpt-5.4"], revision: 1 });
+    expect(await response.json()).toEqual({
+      enabledModels: ["openai/gpt-5.4"],
+      revision: 1,
+      defaultModel: DEFAULT_MODEL,
+    });
   });
 
   it("filters removed models without changing the stored row", async () => {
@@ -77,6 +85,7 @@ describe("Model preferences API", () => {
     expect(await response.json()).toEqual({
       enabledModels: ["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"],
       revision: 1,
+      defaultModel: DEFAULT_MODEL,
     });
     expect(await getStoredModels()).toEqual(stored);
   });
@@ -89,6 +98,7 @@ describe("Model preferences API", () => {
     expect(await response.json()).toEqual({
       enabledModels: ["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"],
       revision: 1,
+      defaultModel: DEFAULT_MODEL,
     });
   });
 
@@ -97,7 +107,11 @@ describe("Model preferences API", () => {
 
     const response = await serviceFetch("https://test.local/model-preferences");
 
-    expect(await response.json()).toEqual({ enabledModels: DEFAULT_ENABLED_MODELS, revision: 1 });
+    expect(await response.json()).toEqual({
+      enabledModels: DEFAULT_ENABLED_MODELS,
+      revision: 1,
+      defaultModel: DEFAULT_MODEL,
+    });
   });
 
   it("returns defaults for a malformed stored value", async () => {
@@ -106,7 +120,11 @@ describe("Model preferences API", () => {
     const response = await serviceFetch("https://test.local/model-preferences");
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ enabledModels: DEFAULT_ENABLED_MODELS, revision: 1 });
+    expect(await response.json()).toEqual({
+      enabledModels: DEFAULT_ENABLED_MODELS,
+      revision: 1,
+      defaultModel: DEFAULT_MODEL,
+    });
   });
 
   it("applies atomic model membership changes and increments the revision", async () => {
@@ -119,7 +137,11 @@ describe("Model preferences API", () => {
 
     const expected = ["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-4-5"];
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ enabledModels: expected, revision: 2 });
+    expect(await response.json()).toEqual({
+      enabledModels: expected,
+      revision: 2,
+      defaultModel: DEFAULT_MODEL,
+    });
     expect(await getStoredModels()).toEqual(expected);
     expect(await getStoredRevision()).toBe(2);
   });

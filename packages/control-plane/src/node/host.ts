@@ -33,6 +33,8 @@ import { SqlCacheStore } from "../db/sql-cache-store";
 import type { SqlDatabase } from "../db/sql-database";
 import type { ObjectStorage } from "../storage/object-storage";
 import { requireRepoSecretsEncryptionKey, requireTokenEncryptionKey } from "../env-validation";
+import { getEffectiveEnabledModels } from "../db/model-preferences";
+import { resolveDefaultModel, warnIfDefaultModelDisabled } from "../default-model";
 import { createLogger, parseLogLevel, type Logger } from "../logger";
 import { catalog } from "../routes/catalog";
 import {
@@ -98,6 +100,7 @@ export async function startNodeHost(options: NodeHostOptions): Promise<NodeHost>
   // opened: a misconfigured key never serves a request and leaves nothing behind.
   requireTokenEncryptionKey(config);
   requireRepoSecretsEncryptionKey(config);
+  resolveDefaultModel(config);
 
   // Everything acquired during boot, released in reverse if a later step fails.
   const acquired: Array<() => void> = [];
@@ -148,6 +151,7 @@ async function boot(
     })
   );
   const migrationsApplied = await countMigrations(db);
+  warnIfDefaultModelDisabled(resolveDefaultModel(config), await getEffectiveEnabledModels(db), log);
 
   const cacheDb = ownStore(openNodeCacheDatabase(settings.dataDir, log));
 

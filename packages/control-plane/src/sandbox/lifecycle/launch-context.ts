@@ -1,5 +1,9 @@
 import { getValidHarnessOrDefault, type HarnessId } from "@open-inspect/shared/harnesses";
-import { extractProviderAndModel, getValidModelOrDefault } from "@open-inspect/shared/models";
+import {
+  extractProviderAndModel,
+  getValidModelOrDefault,
+  type ValidModel,
+} from "@open-inspect/shared/models";
 import {
   omitUnsupportedSandboxSettings,
   unsupportedSandboxSettings,
@@ -41,8 +45,8 @@ export interface SlackAgentNotifyLookup {
 }
 
 export interface SandboxLaunchConfig {
-  /** Default model when the session has no override. */
-  model: string;
+  /** The deployment default (`resolveDefaultModel`) for a session with no valid model. */
+  model: ValidModel;
   mcpServerLookup?: McpServerLookup;
   slackAgentNotifyLookup?: SlackAgentNotifyLookup;
 }
@@ -116,7 +120,7 @@ export class SandboxLaunchContext {
 
   resolveAgent(session: SessionRow): AgentLaunchFields {
     return {
-      ...extractProviderAndModel(getValidModelOrDefault(session.model || this.config.model)),
+      ...extractProviderAndModel(getValidModelOrDefault(session.model, this.config.model)),
       harness: getValidHarnessOrDefault(session.harness),
     };
   }

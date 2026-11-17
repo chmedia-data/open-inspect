@@ -25,7 +25,7 @@ import { SessionMcpContext } from "./mcp-context";
 import { resolveAppName } from "@open-inspect/shared/app-name";
 import { HarnessAdmissionError, validateHarnessExecution } from "../harness-admission";
 import { getValidHarnessOrDefault } from "@open-inspect/shared/harnesses";
-import { DEFAULT_MODEL } from "@open-inspect/shared/models";
+import { resolveDefaultModel } from "../default-model";
 import { sandboxPromptBlockReason } from "@open-inspect/shared/types/sandbox-shutdown";
 import { generateId, hashToken } from "../auth/crypto";
 import { getUserAuth } from "../auth/user/runtime";
@@ -267,6 +267,7 @@ export function createSessionRuntime(platform: SessionPlatform, env: Env): Sessi
   } = platform;
   const { sql } = storage;
   const transaction = <T>(closure: () => T): T => storage.transactionSync(closure);
+  const defaultModel = resolveDefaultModel(env);
 
   // Tier 1 — repositories and alarm persistence (leaves over SqlStorage).
   const attachmentRepository = new SessionAttachmentRepository(sql);
@@ -570,6 +571,7 @@ export function createSessionRuntime(platform: SessionPlatform, env: Env): Sessi
     getExecutionTimeoutMs,
     () => lifecycleManager.mayProcessQueuedWork(),
     () => sandboxPromptBlockReason(lifecycleManager.shutdownSnapshot()),
+    defaultModel,
     (messageId) => mcpContext.prepare(messageId),
     (messageId) => {
       const warning = mcpContext.withheldWarning(messageId);
@@ -814,7 +816,8 @@ export function createSessionRuntime(platform: SessionPlatform, env: Env): Sessi
       backgroundTasks.submit(() => lifecycleManager.warmSandbox(), {
         name: "sandbox.warm",
       }),
-    generateId
+    generateId,
+    defaultModel
   );
   const sessionLifecycleHandler = new SessionLifecycleHandler(
     sessionCoreRepository,
@@ -880,6 +883,7 @@ export function createSessionRuntime(platform: SessionPlatform, env: Env): Sessi
     durableObjectId,
     transaction,
     log,
+    defaultModel,
   });
 
   const accessReader = new SessionAccessReader({
@@ -1199,7 +1203,7 @@ function createLifecycleManager(deps: LifecycleManagerDeps): SandboxLifecycleMan
     ...DEFAULT_LIFECYCLE_CONFIG,
     controlPlaneUrl,
     recordMcpServers: deps.recordMcpServers,
-    model: DEFAULT_MODEL,
+    model: resolveDefaultModel(env),
     // Re-derived per use until the session row exists: on the first-ever
     // activation the manager is built during the init request, before the row
     // is written. Latched afterwards — the manager derives log context from

@@ -761,6 +761,13 @@ variable "sandbox_provider" {
   }
 }
 
+variable "default_model" {
+  description = "Model the control plane gives sessions, prompts and automations that name none, as a catalog id from packages/shared/src/models.ts. Empty keeps the catalog default; an unknown id fails every request until fixed. The bots keep their own *_bot_default_model."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
 variable "session_do_location_hint" {
   description = "Best-effort Cloudflare location hint for new session Durable Objects; empty preserves automatic placement. Existing objects do not move."
   type        = string

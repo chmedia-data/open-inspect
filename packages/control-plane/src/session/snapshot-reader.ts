@@ -3,7 +3,7 @@ import {
   sessionSnapshotSchema,
   type SessionSnapshotState,
 } from "@open-inspect/shared/types/server-messages";
-import { DEFAULT_MODEL } from "@open-inspect/shared/models";
+import type { ValidModel } from "@open-inspect/shared/models";
 import type { SessionRepositoryState } from "@open-inspect/shared/types/repositories";
 import type { Logger } from "../logger";
 import type { SqlDatabase } from "../db/sql-database";
@@ -44,6 +44,8 @@ export interface SessionSnapshotReaderDeps {
   /** DO storage transaction so the snapshot reads are a consistent cut. */
   transaction: <T>(closure: () => T) => T;
   log: Logger;
+  /** From `resolveDefaultModel`: shown for a session with no stored model. */
+  defaultModel: ValidModel;
 }
 
 /**
@@ -104,7 +106,7 @@ export class SessionSnapshotReader {
       messageCount: this.deps.messageRepository.getMessageCount(),
       createdAt: session.created_at,
       harness: getValidHarnessOrDefault(session.harness),
-      model: session.model ?? DEFAULT_MODEL,
+      model: session.model ?? this.deps.defaultModel,
       reasoningEffort: session.reasoning_effort ?? undefined,
       isProcessing: this.getIsProcessing(),
       parentSessionId: session.parent_session_id,

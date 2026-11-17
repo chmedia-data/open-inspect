@@ -33,6 +33,7 @@ import {
   validateHarnessAutomationAuth,
 } from "../harness-admission";
 import { isValidModel, normalizeModelId } from "@open-inspect/shared/models";
+import { resolveDefaultModel } from "../default-model";
 import {
   AutomationStore,
   parseAutomationTriggerFields,
@@ -292,6 +293,7 @@ async function handleCreateAutomation(
       harness,
       model: body.model,
       reasoningEffort: body.reasoningEffort,
+      defaultModel: resolveDefaultModel(env),
     });
   } catch (cause) {
     if (cause instanceof HarnessAdmissionError) return error(cause.message, cause.status);
@@ -610,6 +612,7 @@ async function handleUpdateAutomation(
         model: body.model,
         reasoningEffort: body.reasoningEffort,
         executionChanged,
+        defaultModel: resolveDefaultModel(env),
       }
     );
     if (executionChanged)

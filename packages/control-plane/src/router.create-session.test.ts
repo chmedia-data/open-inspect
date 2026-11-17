@@ -226,6 +226,22 @@ describe("Codex public session creation", () => {
     };
   }
 
+  it("gives a session created without a model the configured DEFAULT_MODEL", async () => {
+    const create = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(SessionIndexStore).mockImplementation(function () {
+      return { create } as never;
+    });
+    const initFetch = vi.fn(async (_request: Request) => Response.json({ status: "created" }));
+    const response = await createSessionRequestWithBody(
+      { ...createEnv(initFetch), DEFAULT_MODEL: "openai/gpt-5.5" },
+      { harness: "opencode" }
+    );
+    expect(response.status).toBe(201);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ model: "openai/gpt-5.5" }));
+    const payload = await initFetch.mock.calls[0][0].json();
+    expect(payload).toMatchObject({ harness: "opencode", model: "openai/gpt-5.5" });
+  });
+
   it.each(SANDBOX_PROVIDER_NAMES)("admits Codex on the %s sandbox provider", async (provider) => {
     vi.spyOn(ModelPreferencesStore.prototype, "getEnabledModels").mockResolvedValue([
       "openai/gpt-5.6-sol",

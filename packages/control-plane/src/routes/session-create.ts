@@ -7,6 +7,7 @@ import {
   getValidHarnessOrDefault,
 } from "@open-inspect/shared/harnesses";
 import { HarnessAdmissionError, resolveHarnessSelection } from "../harness-admission";
+import { resolveDefaultModel } from "../default-model";
 import type {
   CreateSessionInput,
   CreateSessionResponse,
@@ -260,6 +261,7 @@ export async function handleCreateSession(
       harness,
       model: body.model,
       reasoningEffort: body.reasoningEffort,
+      defaultModel: resolveDefaultModel(env),
     });
   } catch (cause) {
     if (cause instanceof HarnessAdmissionError) return error(cause.message, cause.status);

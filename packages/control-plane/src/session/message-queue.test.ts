@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_MODEL } from "@open-inspect/shared/models";
 import { createTestBackgroundTasks } from "../background-tasks.test-support";
 import { fingerprintWebPrompt, SessionMessageQueue } from "./message-queue";
 import { AttachmentClaimConflictError } from "./session-attachment-repository";
@@ -320,6 +321,7 @@ function buildQueue(
     () => executionTimeoutMs,
     mayDispatch,
     getSandboxPromptBlockReason,
+    DEFAULT_MODEL,
     prepareManagedMcp,
     reportManagedMcpWarnings
   );
