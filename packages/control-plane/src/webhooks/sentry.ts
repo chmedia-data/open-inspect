@@ -19,10 +19,12 @@ import {
 } from "../routes/shared";
 import type { Env } from "../types";
 import { createScheduler } from "../scheduler/factory";
+import { readWebhookBody } from "./webhook-body";
 
 /** Maximum Sentry webhook payload size (256KB — Sentry payloads with stack traces can be large). */
 const MAX_PAYLOAD_SIZE = 256 * 1024;
 const logger = createLogger("sentry-webhook");
+const SENTRY_SIGNATURE_PATTERN = /^[0-9a-f]{64}$/;
 
 function classifySentryAction(action: unknown): "created" | "critical" | "other" | "missing" {
   if (action === "created" || action === "critical") return action;
@@ -56,22 +58,16 @@ async function handleSentryWebhook(
     return error("Encryption key not configured", 503);
   }
 
-  // 2. Check signature header before doing any expensive work (decrypt, body read)
+  // 2. Reject a missing or malformed signature before doing any expensive work
+  // (decrypt, body read). Sentry sends a lowercase hex HMAC-SHA256 digest.
   const signature = request.headers.get("sentry-hook-signature");
-  if (!signature) {
+  if (!signature || !SENTRY_SIGNATURE_PATTERN.test(signature)) {
     return error("Invalid signature", 401);
   }
 
-  // Fast-path: reject if Content-Length header exceeds limit
-  const contentLength = parseInt(request.headers.get("content-length") ?? "0", 10);
-  if (contentLength > MAX_PAYLOAD_SIZE) {
-    return error("Payload too large", 413);
-  }
-
-  const body = await request.text();
-  if (body.length > MAX_PAYLOAD_SIZE) {
-    return error("Payload too large", 413);
-  }
+  const read = await readWebhookBody(request, MAX_PAYLOAD_SIZE);
+  if (!read.ok) return read.response;
+  const body = read.text;
 
   // 3. Decrypt stored secret and verify signature
   const secret = await decryptSentrySecret(

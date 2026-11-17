@@ -29,6 +29,16 @@ async function signSentryPayload(body: string, secret: string): Promise<string> 
     .join("");
 }
 
+/** A chunked body without Content-Length that never ends on its own. */
+function endlessBody(): ReadableStream<Uint8Array> {
+  const chunk = new TextEncoder().encode("x".repeat(16 * 1024));
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      controller.enqueue(chunk);
+    },
+  });
+}
+
 function makeAutomation(overrides: Partial<AutomationRow> = {}): AutomationRow {
   return {
     id: `auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -221,6 +231,30 @@ describe("POST /webhooks/sentry/:id", () => {
     });
 
     expect(response.status).toBe(401);
+  });
+
+  it("rejects a malformed signature before reading the body", async () => {
+    const automation = await createSentryAutomation();
+
+    const response = await SELF.fetch(`https://test.local/webhooks/sentry/${automation.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "sentry-hook-signature": "deadbeef" },
+      body: endlessBody(),
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns 413 for an oversized chunked body with a well-formed signature", async () => {
+    const automation = await createSentryAutomation();
+
+    const response = await SELF.fetch(`https://test.local/webhooks/sentry/${automation.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "sentry-hook-signature": "a".repeat(64) },
+      body: endlessBody(),
+    });
+
+    expect(response.status).toBe(413);
   });
 
   it("returns 200 with skipped: true for unsupported event shape", async () => {
@@ -586,6 +620,18 @@ describe("POST /webhooks/automation/:id", () => {
         Authorization: `Bearer ${TEST_API_KEY}`,
       },
       body: largeBody,
+    });
+
+    expect(response.status).toBe(413);
+  });
+
+  it("returns 413 for an oversized chunked body", async () => {
+    const automation = await createWebhookAutomation();
+
+    const response = await SELF.fetch(`https://test.local/webhooks/automation/${automation.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${TEST_API_KEY}` },
+      body: endlessBody(),
     });
 
     expect(response.status).toBe(413);
