@@ -98,6 +98,32 @@ describe("GitHub ingress", () => {
     expect(forwarded[0].text).toBe(JSON.stringify(githubPayload));
   });
 
+  it("verifies the signature over the bytes received, not their decoded text", async () => {
+    const { send, forwarded } = setup([GITHUB_INGRESS]);
+    // A UTF-8 byte order mark, which decoding to text drops.
+    const bytes = new Uint8Array([
+      0xef,
+      0xbb,
+      0xbf,
+      ...new TextEncoder().encode(JSON.stringify(githubPayload)),
+    ]);
+    const request = (signature: string) =>
+      new Request("http://bot/webhooks/github", {
+        method: "POST",
+        headers: {
+          "X-Hub-Signature-256": `sha256=${signature}`,
+          "X-GitHub-Event": "issue_comment",
+          "X-GitHub-Delivery": "aaaa-bbbb",
+        },
+        body: bytes,
+      });
+    const overText = await computeHmacHex(JSON.stringify(githubPayload), ENV.GITHUB_WEBHOOK_SECRET);
+    expect((await send(request(overText))).status).toBe(401);
+    const overBytes = await computeHmacHex(bytes, ENV.GITHUB_WEBHOOK_SECRET);
+    expect((await send(request(overBytes))).status).toBe(200);
+    expect(forwarded).toHaveLength(1);
+  });
+
   it("rejects a forged signature without forwarding", async () => {
     const { send, forward } = setup([GITHUB_INGRESS]);
     const response = await send(await githubRequest(githubPayload, { secret: "wrong" }));
@@ -355,5 +381,24 @@ describe("Linear ingress", () => {
     const replay = await send(await linearRequest(payload, { delivery: "2-2" }));
     expect(replay.status).toBe(409);
     expect(forward).toHaveBeenCalledTimes(1);
+  });
+  it("gives the claim back when the bot fails, so the provider's retry gets through", async () => {
+    const { send, forward } = setup([LINEAR_INGRESS]);
+    forward.mockImplementationOnce(async () => new Response("down", { status: 502 }));
+    forward.mockImplementationOnce(async () => {
+      throw new Error("bot crashed");
+    });
+    expect((await send(await linearRequest(payload))).status).toBe(502);
+    await expect(send(await linearRequest(payload))).rejects.toThrow("bot crashed");
+    expect((await send(await linearRequest(payload))).status).toBe(200);
+    expect((await send(await linearRequest(payload))).status).toBe(409);
+    expect(forward).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps the claim when the bot answers below 500", async () => {
+    const { send, forward } = setup([LINEAR_INGRESS]);
+    forward.mockImplementationOnce(async () => new Response("bad", { status: 400 }));
+    expect((await send(await linearRequest(payload))).status).toBe(400);
+    expect((await send(await linearRequest(payload))).status).toBe(409);
   });
 });

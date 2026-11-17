@@ -13,10 +13,12 @@
  *
  * Two listeners. The public one serves `/health` and the bot's webhook
  * routes, each behind the ingress gate (src/ingress.ts), and nothing else.
- * The internal one, for the control plane on a private network, serves
- * every route the Worker has (callbacks included), with the webhook routes
- * behind the same gate; routes in `blockedPathPrefixes` are served by
- * neither.
+ * The internal one, for the control plane on a private network, serves the
+ * same plus the bot's `internalRoutes` (the callbacks the control plane
+ * makes), each body read under the same cap and deadline. Every other route
+ * the Worker has is served by neither. Both refuse a path that is not in
+ * canonical form (any `%`), since the Worker's router would decode it into
+ * a route these checks did not see.
  */
 
 import { getRequestListener } from "@hono/node-server";
@@ -28,7 +30,7 @@ import {
   signedControlPlaneFetch,
 } from "@open-inspect/shared/service-auth";
 import type { BotDefinition } from "./bots";
-import { createIngressGate, type IngressLimits } from "./ingress";
+import { createIngressGate, readBounded, type IngressLimits } from "./ingress";
 import { openBotDatabase, ReplayLedger, SqliteKv, SqliteQueue } from "./store";
 
 export interface BotHostSettings {
@@ -110,6 +112,14 @@ class BackgroundWork {
   }
 }
 
+/**
+ * A path the Worker's router will see exactly as written: no percent-encoding to decode
+ * (`/%6Fauth/` would route to `/oauth/`), and unchanged by URL normalization.
+ */
+function isCanonicalPath(pathname: string): boolean {
+  return !pathname.includes("%") && new URL(pathname, "http://host").pathname === pathname;
+}
+
 function listen(server: Server, host: string, port: number): Promise<AddressInfo> {
   return new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -172,7 +182,11 @@ export async function startBotHost(options: BotHostOptions): Promise<BotHost> {
           { SERVICE_AUTH_SECRET: options.env.SERVICE_AUTH_SECRET, CONTROL_PLANE: controlPlane },
           { method: "POST", url: `https://internal${path}`, body: JSON.stringify(body) }
         );
-        if (!response.ok) throw new Error(`Control plane refused the job: ${response.status}`);
+        if (!response.ok) {
+          // The bot answers GitHub 503, which GitHub does not retry: it needs a manual redelivery.
+          log.error("autofix.refused", { http_status: response.status });
+          throw new Error(`Control plane refused the job: ${response.status}`);
+        }
       },
     };
   }
@@ -200,18 +214,43 @@ export async function startBotHost(options: BotHostOptions): Promise<BotHost> {
       { status: draining ? 503 : 200, headers: { "Cache-Control": "no-store" } }
     );
 
+  const notFound = (): Response => new Response("Not Found", { status: 404 });
+  const isInternalRoute = (pathname: string): boolean =>
+    bot.internalRoutes.some((entry) =>
+      entry.endsWith("/") ? pathname.startsWith(entry) : pathname === entry
+    );
+
+  /** An internal route's body, read under the gate's cap and deadline before the Worker runs. */
+  const callWorkerBounded = async (request: Request): Promise<Response> => {
+    const bytes = await readBounded(request, settings.limits);
+    if (!(bytes instanceof Uint8Array)) {
+      log.warn("internal.rejected", { http_status: bytes.status, reject_reason: bytes.reason });
+      return Response.json({ error: bytes.reason }, { status: bytes.status });
+    }
+    const hasBody = request.method !== "GET" && request.method !== "HEAD";
+    return callWorker(
+      new Request(request.url, {
+        method: request.method,
+        headers: request.headers,
+        body: hasBody ? bytes : undefined,
+      })
+    );
+  };
+
   const handler =
     (scope: "public" | "internal") =>
     async (request: Request): Promise<Response> => {
       const { pathname } = new URL(request.url);
+      if (!isCanonicalPath(pathname)) {
+        await request.body?.cancel().catch(() => undefined);
+        return notFound();
+      }
       if (request.method === "GET" && pathname === "/health") return health();
       const route = gate.match(request);
       if (route) return gate.handle(route, request, callWorker);
-      if (scope === "public") return new Response("Not Found", { status: 404 });
-      if (bot.blockedPathPrefixes.some((prefix) => pathname.startsWith(prefix))) {
-        return new Response("Not Found", { status: 404 });
-      }
-      return callWorker(request);
+      if (scope === "internal" && isInternalRoute(pathname)) return callWorkerBounded(request);
+      await request.body?.cancel().catch(() => undefined);
+      return notFound();
     };
 
   const serve = (scope: "public" | "internal"): Server =>

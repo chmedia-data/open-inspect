@@ -20,18 +20,20 @@
 
 import { computeHmacHex, timingSafeEqual } from "@open-inspect/shared/auth";
 import { readBodyCapped } from "@open-inspect/shared/http-body";
-import { verifySlackSignature } from "@open-inspect/shared/slack";
 import type { Logger } from "@open-inspect/shared/logger";
 import type { ReplayLedger } from "./store";
 
 /** Why the gate turned a request away, as logged and as answered. */
-type Rejection = { status: 401 | 403 | 408 | 409 | 413 | 503; reason: string };
+export type Rejection = { status: 401 | 403 | 408 | 409 | 413 | 503; reason: string };
 
 /** What the gate needs from the bot's configuration; read once at boot. */
 export type IngressEnv = Record<string, string | undefined>;
 
 /** A request whose body has been read and authenticated. */
 interface VerifiedWebhook {
+  /** The body exactly as received; signatures are checked over these bytes. */
+  bytes: Uint8Array<ArrayBuffer>;
+  /** The body decoded as UTF-8, for reading the payload once it is authenticated. */
   text: string;
   headers: Headers;
   env: IngressEnv;
@@ -44,7 +46,7 @@ export interface WebhookIngress {
   path: string;
   /** Header syntax (and signed-timestamp freshness), checked before the body is read. */
   precheck(headers: Headers, nowMs: number): string | null;
-  /** The provider's signature over exactly `text`. */
+  /** The provider's signature over exactly `bytes`. */
   verify(request: VerifiedWebhook): Promise<boolean>;
   /** Freshness and tenant checks on the authenticated payload. */
   admit(request: VerifiedWebhook): string | null;
@@ -128,10 +130,10 @@ export const GITHUB_INGRESS: WebhookIngress = {
     }
     return null;
   },
-  async verify({ text, headers, env }) {
+  async verify({ bytes, headers, env }) {
     const secret = env.GITHUB_WEBHOOK_SECRET ?? "";
     const expected = (headers.get("x-hub-signature-256") ?? "").slice(7);
-    return timingSafeEqual(expected, await computeHmacHex(text, secret));
+    return timingSafeEqual(expected, await computeHmacHex(bytes, secret));
   },
   admit({ text, headers, env }) {
     const payload = parseJsonObject(text);
@@ -168,12 +170,15 @@ function slackIngress(path: "/events" | "/interactions"): WebhookIngress {
       if (Math.abs(nowMs - Number(timestamp) * 1000) > SLACK_MAX_SKEW_MS) return "stale_timestamp";
       return null;
     },
-    verify({ text, headers, env }) {
-      return verifySlackSignature(
-        headers.get("x-slack-signature"),
-        headers.get("x-slack-request-timestamp"),
-        text,
-        env.SLACK_SIGNING_SECRET ?? ""
+    async verify({ bytes, headers, env }) {
+      // Slack signs `v0:<timestamp>:<body>`; the timestamp's freshness was checked in precheck.
+      const prefix = new TextEncoder().encode(`v0:${headers.get("x-slack-request-timestamp")}:`);
+      const signed = new Uint8Array(prefix.length + bytes.length);
+      signed.set(prefix);
+      signed.set(bytes, prefix.length);
+      return timingSafeEqual(
+        (headers.get("x-slack-signature") ?? "").slice(3),
+        await computeHmacHex(signed, env.SLACK_SIGNING_SECRET ?? "")
       );
     },
     admit({ text, env }) {
@@ -213,11 +218,11 @@ export const LINEAR_INGRESS: WebhookIngress = {
     }
     return null;
   },
-  async verify({ text, headers, env }) {
+  async verify({ bytes, headers, env }) {
     const secret = env.LINEAR_WEBHOOK_SECRET ?? "";
     return timingSafeEqual(
       headers.get("linear-signature") ?? "",
-      await computeHmacHex(text, secret)
+      await computeHmacHex(bytes, secret)
     );
   },
   admit({ text, env, nowMs }) {
@@ -248,10 +253,10 @@ export const LINEAR_INGRESS: WebhookIngress = {
 };
 
 /** Read `body` under the cap and the deadline; the stream is cancelled at either. */
-async function readBounded(
+export async function readBounded(
   request: Request,
   limits: IngressLimits
-): Promise<Uint8Array | Rejection> {
+): Promise<Uint8Array<ArrayBuffer> | Rejection> {
   const declared = request.headers.get("content-length");
   if (declared !== null && Number(declared) > limits.maxBodyBytes) {
     await request.body?.cancel().catch(() => undefined);
@@ -295,7 +300,9 @@ export function createIngressGate(options: {
   const inFlight = new Set<string>();
 
   const refuse = (route: WebhookIngress, rejection: Rejection): Response => {
-    options.log.warn("ingress.rejected", {
+    // A 503 is a delivery the provider will not retry on its own: someone has to redeliver it.
+    const level = rejection.status === 503 ? "error" : "warn";
+    options.log[level]("ingress.rejected", {
       http_path: route.path,
       http_status: rejection.status,
       reject_reason: rejection.reason,
@@ -323,7 +330,7 @@ export function createIngressGate(options: {
         return refuse(route, { status: 503, reason: "too_many_concurrent_reads" });
       }
       reading++;
-      let bytes: Uint8Array | Rejection;
+      let bytes: Uint8Array<ArrayBuffer> | Rejection;
       try {
         bytes = await readBounded(request, options.limits);
       } finally {
@@ -332,6 +339,7 @@ export function createIngressGate(options: {
       if (!(bytes instanceof Uint8Array)) return refuse(route, bytes);
 
       const verified: VerifiedWebhook = {
+        bytes,
         text: new TextDecoder().decode(bytes),
         headers: request.headers,
         env: options.env,
@@ -356,14 +364,24 @@ export function createIngressGate(options: {
       }
 
       inFlight.add(replay.identity);
+      // A refused repeat can only be the provider's retry if the first attempt failed, so a
+      // failed attempt gives its claim back; it had no effect a replay could repeat.
+      const release = () => {
+        if (!replay.allowRepeat) options.ledger.release(replay.identity);
+      };
       try {
-        return await forward(
+        const response = await forward(
           new Request(request.url, {
             method: request.method,
             headers: request.headers,
-            body: bytes as Uint8Array<ArrayBuffer>,
+            body: bytes,
           })
         );
+        if (response.status >= 500) release();
+        return response;
+      } catch (error) {
+        release();
+        throw error;
       } finally {
         inFlight.delete(replay.identity);
       }

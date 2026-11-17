@@ -164,6 +164,11 @@ export class ReplayLedger {
       throw error;
     }
   }
+
+  /** Forget `identity`, so the next request with it is fresh again. */
+  release(identity: string): void {
+    this.store.db.prepare("DELETE FROM replay WHERE identity = ?").run(identity);
+  }
 }
 
 /** A message as the queue hands it to the consumer. */

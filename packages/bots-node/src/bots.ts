@@ -35,8 +35,11 @@ export interface BotDefinition {
   ingress: readonly WebhookIngress[];
   /** Variables the host or the gate cannot run without. */
   requiredEnv: readonly string[];
-  /** Routes the Worker serves that this host never does. */
-  blockedPathPrefixes: readonly string[];
+  /**
+   * What the internal listener serves besides the webhook routes: the paths the control
+   * plane calls on this bot. An entry ending in `/` is a prefix; any other is exact.
+   */
+  internalRoutes: readonly string[];
   queue?: BotQueue;
   /** A Queue the bot produces to that the control plane consumes, sent over HTTP instead. */
   controlPlaneQueue?: { binding: string; path: string };
@@ -62,7 +65,8 @@ export const BOTS: Record<BotName, BotDefinition> = {
       "GITHUB_BOT_USERNAME",
       "DEFAULT_MODEL",
     ],
-    blockedPathPrefixes: [],
+    // The control plane calls nothing on the GitHub bot.
+    internalRoutes: [],
     // The control plane consumes Autofix jobs; on this host they reach it as a signed POST.
     controlPlaneQueue: { binding: "AUTOFIX_QUEUE", path: "/internal/github-autofix" },
   },
@@ -80,7 +84,7 @@ export const BOTS: Record<BotName, BotDefinition> = {
       "WEB_APP_URL",
       "DEFAULT_MODEL",
     ],
-    blockedPathPrefixes: [],
+    internalRoutes: ["/callbacks/", "/internal/thread-context", "/internal/channel-info"],
     queue: {
       binding: "SLACK_COMPLETION_QUEUE",
       consume: slackBot.queue as unknown as BotQueue["consume"],
@@ -104,9 +108,9 @@ export const BOTS: Record<BotName, BotDefinition> = {
       "WEB_APP_URL",
       "DEFAULT_MODEL",
     ],
-    // The Worker's install flow has no OAuth state or owner check, so this host does not
-    // serve it at all; see the package README for installing the Linear app.
-    blockedPathPrefixes: ["/oauth/"],
+    // Not `/oauth/`: the Worker's install flow has no OAuth state or owner check, so this
+    // host does not serve it at all; see the package README for installing the Linear app.
+    internalRoutes: ["/callbacks/"],
   },
 };
 

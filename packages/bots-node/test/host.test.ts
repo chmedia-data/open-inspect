@@ -52,7 +52,7 @@ function fakeBot(overrides: Partial<BotDefinition>): BotDefinition {
     kvBinding: "TEST_KV",
     ingress: [],
     requiredEnv: [],
-    blockedPathPrefixes: [],
+    internalRoutes: ["/"],
     ...overrides,
   };
 }
@@ -64,13 +64,39 @@ describe("the host", () => {
     );
   });
 
-  it("serves the Worker's other routes on the internal listener only, minus blocked ones", async () => {
-    const { publicUrl, internalUrl } = await start(fakeBot({ blockedPathPrefixes: ["/oauth/"] }));
+  it("serves only its internal routes, and only on the internal listener", async () => {
+    const { publicUrl, internalUrl } = await start(
+      fakeBot({ internalRoutes: ["/callbacks/", "/internal/thread-context"] })
+    );
     expect((await fetch(`${publicUrl}/callbacks/complete`, { method: "POST" })).status).toBe(404);
     const internal = await fetch(`${internalUrl}/callbacks/complete`, { method: "POST" });
     expect(await internal.text()).toBe("from worker");
-    expect((await fetch(`${internalUrl}/oauth/authorize`)).status).toBe(404);
+    expect((await fetch(`${internalUrl}/internal/thread-context`)).status).toBe(200);
+    for (const path of ["/oauth/authorize", "/internal/thread-context-x", "/callbacks"]) {
+      expect((await fetch(`${internalUrl}${path}`)).status).toBe(404);
+    }
     expect((await fetch(`${publicUrl}/health`)).status).toBe(200);
+  });
+
+  it("caps and times internal bodies like webhook bodies", async () => {
+    const { internalUrl } = await start(fakeBot({}));
+    const oversized = await fetch(`${internalUrl}/callbacks/complete`, {
+      method: "POST",
+      body: "x".repeat(DEFAULT_INGRESS_LIMITS.maxBodyBytes + 1),
+    });
+    expect(oversized.status).toBe(413);
+    const chunked = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(DEFAULT_INGRESS_LIMITS.maxBodyBytes + 1));
+        controller.close();
+      },
+    });
+    const streamed = await fetch(`${internalUrl}/callbacks/complete`, {
+      method: "POST",
+      body: chunked,
+      duplex: "half",
+    } as RequestInit);
+    expect(streamed.status).toBe(413);
   });
 
   it("gives the Worker a durable KV and a tracked waitUntil", async () => {
@@ -195,6 +221,18 @@ describe("the Linear bot under the host", () => {
     for (const base of [publicUrl, internalUrl]) {
       expect((await fetch(`${base}/oauth/authorize`, { redirect: "manual" })).status).toBe(404);
       expect((await fetch(`${base}/oauth/callback?code=x`)).status).toBe(404);
+    }
+  });
+
+  it("refuses percent-encoded paths that would decode onto a route, on both listeners", async () => {
+    const { publicUrl, internalUrl } = await start(BOTS.linear, env);
+    for (const base of [publicUrl, internalUrl]) {
+      expect((await fetch(`${base}/%6Fauth/callback?code=x`)).status).toBe(404);
+      expect((await fetch(`${base}/%6fauth/authorize`, { redirect: "manual" })).status).toBe(404);
+      const webhook = await fetch(`${base}/%77ebhook`, { method: "POST", body: "{}" });
+      expect(webhook.status).toBe(404);
+      const callback = await fetch(`${base}/callbacks/%63omplete`, { method: "POST", body: "{}" });
+      expect(callback.status).toBe(404);
     }
   });
 
