@@ -410,4 +410,17 @@ describe("createServiceUrlFetcher", () => {
     expect(seen[0].headers.get("X-Test")).toBe("1");
     expect(await seen[0].text()).toBe("payload");
   });
+
+  it("refuses a protocol-relative path rather than leave the base origin", async () => {
+    const sent = vi.fn(async () => new Response("ok"));
+    const fetcher = createServiceUrlFetcher("http://bot:8080", sent);
+
+    await expect(fetcher.fetch("https://internal//evil.example/callbacks")).rejects.toThrow(
+      "protocol-relative"
+    );
+    await expect(
+      fetcher.fetch(new Request("https://internal//evil.example/x", { method: "POST" }))
+    ).rejects.toThrow("protocol-relative");
+    expect(sent).not.toHaveBeenCalled();
+  });
 });

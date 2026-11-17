@@ -389,6 +389,10 @@ export function createServiceUrlFetcher(
   const origin = new URL(baseUrl).origin;
   const target = (url: string | URL): URL => {
     const parsed = new URL(url);
+    // `//host/...` would resolve against the scheme alone and leave `origin`.
+    if (parsed.pathname.startsWith("//")) {
+      throw new Error(`Refusing a protocol-relative service path: ${parsed.pathname}`);
+    }
     return new URL(parsed.pathname + parsed.search, origin);
   };
   return {

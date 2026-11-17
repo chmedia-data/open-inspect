@@ -44,11 +44,14 @@ export function bytesToHex(bytes: Uint8Array): string {
  * This is the shared primitive used by webhook verification, callback
  * signing, and internal token generation across all Open-Inspect services.
  *
- * @param data - The data to sign
+ * @param data - The data to sign: text (UTF-8 encoded) or raw bytes
  * @param secret - The HMAC secret key
  * @returns 64-character lowercase hex string
  */
-export async function computeHmacHex(data: string, secret: string): Promise<string> {
+export async function computeHmacHex(
+  data: string | Uint8Array<ArrayBuffer>,
+  secret: string
+): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -57,7 +60,8 @@ export async function computeHmacHex(data: string, secret: string): Promise<stri
     false,
     ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+  const bytes = typeof data === "string" ? encoder.encode(data) : data;
+  const sig = await crypto.subtle.sign("HMAC", key, bytes);
   return bytesToHex(new Uint8Array(sig));
 }
 
