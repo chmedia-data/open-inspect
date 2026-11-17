@@ -22,6 +22,8 @@ export interface DockerSandboxLimits {
   pidsLimit: number;
   /** OCI runtime name such as `runsc`; the daemon default when unset. */
   runtime?: string;
+  /** Resolver IPv4 addresses for every sandbox; Docker's embedded resolver when empty. */
+  dns: string[];
   maxRunning: number;
   minFreeDiskPercent: number;
   stoppedRetentionMs: number;
@@ -34,6 +36,7 @@ type DockerLimitEnv = Pick<
   | "DOCKER_SANDBOX_CPUS"
   | "DOCKER_SANDBOX_PIDS_LIMIT"
   | "DOCKER_SANDBOX_RUNTIME"
+  | "DOCKER_SANDBOX_DNS"
   | "DOCKER_SANDBOX_MAX_RUNNING"
   | "DOCKER_SANDBOX_MIN_FREE_DISK_PERCENT"
   | "DOCKER_SANDBOX_STOPPED_RETENTION_MS"
@@ -65,6 +68,13 @@ export function resolveDockerSandboxLimits(env: DockerLimitEnv): DockerSandboxLi
   if (runtime && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(runtime)) {
     throw new Error("DOCKER_SANDBOX_RUNTIME must name a runtime registered with the Docker daemon");
   }
+  const dns = (env.DOCKER_SANDBOX_DNS ?? "")
+    .split(",")
+    .map((address) => address.trim())
+    .filter(Boolean);
+  if (!dns.every(isIpv4)) {
+    throw new Error("DOCKER_SANDBOX_DNS must be a comma-separated list of IPv4 addresses");
+  }
   const minFreeDiskPercent = number(
     "DOCKER_SANDBOX_MIN_FREE_DISK_PERCENT",
     env.DOCKER_SANDBOX_MIN_FREE_DISK_PERCENT,
@@ -85,6 +95,7 @@ export function resolveDockerSandboxLimits(env: DockerLimitEnv): DockerSandboxLi
       16
     ),
     runtime,
+    dns,
     maxRunning: positive(
       "DOCKER_SANDBOX_MAX_RUNNING",
       env.DOCKER_SANDBOX_MAX_RUNNING,
@@ -99,6 +110,11 @@ export function resolveDockerSandboxLimits(env: DockerLimitEnv): DockerSandboxLi
       60_000
     ),
   };
+}
+
+function isIpv4(value: string): boolean {
+  const octets = value.split(".");
+  return octets.length === 4 && octets.every((o) => /^\d{1,3}$/.test(o) && Number(o) <= 255);
 }
 
 function positive(name: string, value: string | undefined, fallback: number, min: number): number {

@@ -207,6 +207,7 @@ export class DockerSandboxProvider implements SandboxProvider {
             NanoCpus: limits.nanoCpus,
             PidsLimit: limits.pidsLimit,
             ...(limits.runtime ? { Runtime: limits.runtime } : {}),
+            ...(limits.dns.length ? { Dns: limits.dns } : {}),
           },
         }
       );
