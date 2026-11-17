@@ -6,6 +6,7 @@
  * background and is additive: its failure never affects automation matching.
  */
 
+import { githubAutofixEnvelopeSchema } from "@open-inspect/shared";
 import type { GitHubAutomationEvent } from "@open-inspect/shared/triggers";
 import { listArtifactsResponseSchema } from "@open-inspect/shared/types/artifacts";
 import { SessionIndexStore } from "../db/session-index";
@@ -137,4 +138,43 @@ githubAutomationEventRoutes.post(
   "/internal/github-event",
   admit({ ...GITHUB_SERVICE_ROUTE, authorization: serviceAuthorized("github-bot") }),
   (c) => dispatch(c, handleGitHubAutomationEvent)
+);
+
+/**
+ * The Autofix handoff for a github-bot that has no Queue binding (the Node
+ * bots host): the envelope it would have sent to `AUTOFIX_QUEUE` is posted
+ * here and becomes the same `github.autofix` job the Queue consumer
+ * delivers. The job is durable before the 202, so a failure here reaches
+ * the bot as a 5xx and the delivery stays redeliverable.
+ */
+async function handleGitHubAutofixEnqueue(
+  request: Request,
+  env: Env,
+  _params: object,
+  ctx: RequestContext
+): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return error("Invalid JSON", 400);
+  }
+  const parsed = githubAutofixEnvelopeSchema.safeParse(body);
+  if (!parsed.success) {
+    createLogger("webhook:github-autofix").warn("Autofix envelope rejected", {
+      event: "github_autofix.enqueue_rejected",
+      issue_paths: parsed.error.issues.map((issue) => issue.path.join(".")),
+      request_id: ctx.request_id,
+      trace_id: ctx.trace_id,
+    });
+    return error("Invalid Autofix envelope", 400);
+  }
+  await env.JOBS.send({ kind: "github.autofix", payload: parsed.data });
+  return new Response(null, { status: 202 });
+}
+
+githubAutomationEventRoutes.post(
+  "/internal/github-autofix",
+  admit({ ...GITHUB_SERVICE_ROUTE, authorization: serviceAuthorized("github-bot") }),
+  (c) => dispatch(c, handleGitHubAutofixEnqueue)
 );

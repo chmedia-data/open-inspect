@@ -16,7 +16,8 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { EnvConfig } from "../types";
+import { createServiceUrlFetcher } from "@open-inspect/shared/service-auth";
+import type { EnvConfig, Platform } from "../types";
 import { parseTeamsEnforcementMode } from "../authorization/teams-enforcement";
 
 /** A source of configuration values, `process.env` in production. */
@@ -246,4 +247,28 @@ function integer(name: string, value: string | undefined, fallback: number): num
   if (raw === undefined) return fallback;
   if (!/^\d+$/.test(raw)) throw new Error(`${name} must be a non-negative integer, got ${raw}`);
   return Number(raw);
+}
+
+/**
+ * Where the Slack and Linear bots listen when they run as their own Node
+ * processes (`packages/bots-node`): the stand-in for the Workers service
+ * bindings the control plane calls them through. Unset leaves that bot
+ * unbound, as on a deployment without it.
+ */
+export const BOT_SERVICE_VARIABLE_NAMES = ["SLACK_BOT_URL", "LINEAR_BOT_URL"] as const;
+
+/** The bot fetchers `source` configures, each sending to its bot's origin. */
+export function readBotServiceFetchers(
+  source: ConfigSource
+): Pick<Platform, "SLACK_BOT" | "LINEAR_BOT"> {
+  const variables = pickVariables(source, BOT_SERVICE_VARIABLE_NAMES);
+  const fetcherFor = (name: (typeof BOT_SERVICE_VARIABLE_NAMES)[number]) => {
+    const url = present(variables[name]);
+    if (url === undefined) return undefined;
+    if (!/^https?:\/\/[^/]/.test(url)) {
+      throw new Error(`${name} must be an absolute http(s) URL, got ${url}`);
+    }
+    return createServiceUrlFetcher(url);
+  };
+  return { SLACK_BOT: fetcherFor("SLACK_BOT_URL"), LINEAR_BOT: fetcherFor("LINEAR_BOT_URL") };
 }

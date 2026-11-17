@@ -10,12 +10,14 @@ import {
   buildOutboundAuthHeaders,
   buildServiceAuthHeaders,
   canonicalizeQuery,
+  createServiceUrlFetcher,
   isServiceName,
   parseServiceSignatureHeader,
   resolveOutboundCredential,
   SERVICE_HEADER,
   SERVICE_SIGNATURE_HEADER,
   sha256Hex,
+  signedControlPlaneFetch,
   verifyServiceSignature,
   type ServiceName,
 } from "./service-auth";
@@ -355,5 +357,70 @@ describe("isServiceName", () => {
     for (const name of ["", "WEB", "modal", "sandbox", "slackbot", "unknown"]) {
       expect(isServiceName(name)).toBe(false);
     }
+  });
+});
+
+describe("createServiceUrlFetcher", () => {
+  it("sends a signed internal URL to the base origin and it still verifies there", async () => {
+    const seen: Request[] = [];
+    const fetcher = createServiceUrlFetcher("http://app:8787/ignored-path", async (input, init) => {
+      seen.push(new Request(input, init));
+      return new Response(null, { status: 204 });
+    });
+    const secret = "fetcher-secret";
+    const body = JSON.stringify({ hello: "world" });
+
+    await signedControlPlaneFetch(
+      "github-bot",
+      { SERVICE_AUTH_SECRET: secret, CONTROL_PLANE: fetcher },
+      { method: "POST", url: "https://internal/internal/github-event?b=2&a=1", body }
+    );
+
+    const [request] = seen;
+    expect(request.url).toBe("http://app:8787/internal/github-event?b=2&a=1");
+    const verified = await verifyServiceSignature({
+      signatureHeader: request.headers.get(SERVICE_SIGNATURE_HEADER) ?? "",
+      service: "github-bot",
+      secret,
+      method: request.method,
+      url: request.url,
+      bodySha256Hex: await sha256Hex(await request.text()),
+      actor: "",
+    });
+    expect(verified.ok).toBe(true);
+  });
+
+  it("rewrites a Request input, keeping its method, headers and body", async () => {
+    const seen: Request[] = [];
+    const fetcher = createServiceUrlFetcher("http://bot:8080", async (input, init) => {
+      seen.push(new Request(input, init));
+      return new Response("ok");
+    });
+
+    await fetcher.fetch(
+      new Request("https://internal/callbacks/complete", {
+        method: "POST",
+        headers: { "X-Test": "1" },
+        body: "payload",
+      })
+    );
+
+    expect(seen[0].url).toBe("http://bot:8080/callbacks/complete");
+    expect(seen[0].method).toBe("POST");
+    expect(seen[0].headers.get("X-Test")).toBe("1");
+    expect(await seen[0].text()).toBe("payload");
+  });
+
+  it("refuses a protocol-relative path rather than leave the base origin", async () => {
+    const sent = vi.fn(async () => new Response("ok"));
+    const fetcher = createServiceUrlFetcher("http://bot:8080", sent);
+
+    await expect(fetcher.fetch("https://internal//evil.example/callbacks")).rejects.toThrow(
+      "protocol-relative"
+    );
+    await expect(
+      fetcher.fetch(new Request("https://internal//evil.example/x", { method: "POST" }))
+    ).rejects.toThrow("protocol-relative");
+    expect(sent).not.toHaveBeenCalled();
   });
 });

@@ -44,11 +44,14 @@ export function bytesToHex(bytes: Uint8Array): string {
  * This is the shared primitive used by webhook verification, callback
  * signing, and internal token generation across all Open-Inspect services.
  *
- * @param data - The data to sign
+ * @param data - The data to sign: text (UTF-8 encoded) or raw bytes
  * @param secret - The HMAC secret key
  * @returns 64-character lowercase hex string
  */
-export async function computeHmacHex(data: string, secret: string): Promise<string> {
+export async function computeHmacHex(
+  data: string | Uint8Array<ArrayBuffer>,
+  secret: string
+): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -57,7 +60,8 @@ export async function computeHmacHex(data: string, secret: string): Promise<stri
     false,
     ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+  const bytes = typeof data === "string" ? encoder.encode(data) : data;
+  const sig = await crypto.subtle.sign("HMAC", key, bytes);
   return bytesToHex(new Uint8Array(sig));
 }
 
@@ -111,4 +115,18 @@ export async function verifyCallbackFromControlPlane<T extends { signature: stri
   return Boolean(
     env.SERVICE_AUTH_SECRET && (await verifyCallbackSignature(payload, env.SERVICE_AUTH_SECRET))
   );
+}
+
+/**
+ * Decode a PEM private key (PKCS#8 or PKCS#1) to its DER bytes.
+ *
+ * Accepts the key with real newlines or with the two-character `\n` an
+ * environment file leaves when a multi-line key is stored on one line.
+ */
+export function parsePemPrivateKey(pem: string): Uint8Array {
+  const pemContents = pem
+    .replace(/-----(BEGIN|END) (RSA )?PRIVATE KEY-----/g, "")
+    .replace(/\\n/g, "")
+    .replace(/\s/g, "");
+  return Uint8Array.from(atob(pemContents), (char) => char.charCodeAt(0));
 }

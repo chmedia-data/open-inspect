@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MIGRATIONS_DIR, readEnvConfig, readNodeHostSettings } from "./config";
+import {
+  DEFAULT_MIGRATIONS_DIR,
+  readBotServiceFetchers,
+  readEnvConfig,
+  readNodeHostSettings,
+} from "./config";
 
 const REQUIRED = {
   DEPLOYMENT_NAME: "test",
@@ -92,5 +97,28 @@ describe("readNodeHostSettings", () => {
     expect(() => readNodeHostSettings({ DATA_DIR: "data", PORT: "80a" })).toThrow(
       "PORT must be a non-negative integer, got 80a"
     );
+  });
+});
+
+describe("readBotServiceFetchers", () => {
+  it("leaves both bots unbound when nothing is set", () => {
+    expect(readBotServiceFetchers({ SLACK_BOT_URL: "" })).toEqual({
+      SLACK_BOT: undefined,
+      LINEAR_BOT: undefined,
+    });
+  });
+
+  it("binds each configured bot", () => {
+    const fetchers = readBotServiceFetchers({ LINEAR_BOT_URL: "http://linear-bot:8080" });
+    expect(fetchers.SLACK_BOT).toBeUndefined();
+    expect(fetchers.LINEAR_BOT).toBeDefined();
+  });
+
+  it("rejects a URL that is not absolute http(s)", () => {
+    for (const url of ["slack-bot:8080", "/slack"]) {
+      expect(() => readBotServiceFetchers({ SLACK_BOT_URL: url })).toThrow(
+        "SLACK_BOT_URL must be an absolute http(s) URL"
+      );
+    }
   });
 });

@@ -76,6 +76,8 @@ export interface NodeHostOptions {
   config: EnvConfig;
   settings: NodeHostSettings;
   objectStorage: ObjectStorage;
+  /** The bots the control plane calls back, when they run beside it. */
+  botServices?: Pick<Platform, "SLACK_BOT" | "LINEAR_BOT">;
   /** The route modules to serve: the production catalog unless a test supplies its own. */
   routes?: readonly RouteModule[];
 }
@@ -227,6 +229,7 @@ async function boot(
     REPOS_CACHE: new SqlCacheStore(cacheDb),
     MEDIA_BUCKET: options.objectStorage,
     JOBS: jobs,
+    ...options.botServices,
   };
   const env: Env = { ...config, ...platform };
   const portalConfig = dockerBackend ? resolveDockerPortalConfig(config) : undefined;

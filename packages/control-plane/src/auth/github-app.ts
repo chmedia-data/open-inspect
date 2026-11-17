@@ -11,6 +11,7 @@
 
 import type { InstallationRepository } from "@open-inspect/shared/types/repository-catalog";
 import { DEFAULT_APP_NAME } from "@open-inspect/shared/app-name";
+import { parsePemPrivateKey } from "@open-inspect/shared/auth";
 import { CACHE_STORE_MIN_TTL_MS, type CacheStore } from "@open-inspect/shared/cache-store";
 import { sha256Hex } from "@open-inspect/shared/service-auth";
 import { z } from "zod";
@@ -147,29 +148,6 @@ const listInstallationReposResponseSchema = z.object({
 type ListInstallationReposResponse = z.infer<typeof listInstallationReposResponseSchema>;
 
 const repositoryBranchesResponseSchema = z.array(z.object({ name: z.string() }));
-
-/**
- * Parse PEM-encoded private key to raw bytes.
- */
-function parsePemPrivateKey(pem: string): Uint8Array {
-  // Remove PEM header/footer and newlines, including the two-character
-  // `\n` an environment file leaves in place of a newline.
-  const pemContents = pem
-    .replace(/-----BEGIN RSA PRIVATE KEY-----/g, "")
-    .replace(/-----END RSA PRIVATE KEY-----/g, "")
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\\n/g, "")
-    .replace(/\s/g, "");
-
-  // Decode base64
-  const binaryString = atob(pemContents);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
 
 /**
  * Import RSA private key for signing.

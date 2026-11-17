@@ -374,3 +374,39 @@ export async function signedControlPlaneFetch(
     signal: init?.signal,
   });
 }
+
+/**
+ * A `FetchClient` that stands in for a service binding over plain HTTP: the
+ * caller's Worker-style URL (`https://internal/internal/github-event`) is
+ * sent to `baseUrl`'s origin with its path and query unchanged. Signatures
+ * bind only method, path, query and body, so a signed request verifies at
+ * the destination exactly as it would through a binding.
+ */
+export function createServiceUrlFetcher(
+  baseUrl: string,
+  fetchImpl: typeof fetch = fetch
+): FetchClient {
+  const origin = new URL(baseUrl).origin;
+  const target = (url: string | URL): URL => {
+    const parsed = new URL(url);
+    // `//host/...` would resolve against the scheme alone and leave `origin`.
+    if (parsed.pathname.startsWith("//")) {
+      throw new Error(`Refusing a protocol-relative service path: ${parsed.pathname}`);
+    }
+    return new URL(parsed.pathname + parsed.search, origin);
+  };
+  return {
+    async fetch(input, init) {
+      if (!(input instanceof Request)) return fetchImpl(target(input), init);
+      const body =
+        input.method === "GET" || input.method === "HEAD" ? undefined : await input.arrayBuffer();
+      return fetchImpl(target(input.url), {
+        method: input.method,
+        headers: input.headers,
+        body,
+        signal: input.signal,
+        ...init,
+      });
+    },
+  };
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@open-inspect/bots-node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --format=esm --outfile=dist/main.js --platform=node --target=node24 --external:node:* --banner:js=\"import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);\"",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ test/",
+    "lint:fix": "eslint src/ test/ --fix"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.4",
+    "@open-inspect/shared": "file:../shared"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.12"
+  }
+}

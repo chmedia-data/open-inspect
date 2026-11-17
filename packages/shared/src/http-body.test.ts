@@ -60,3 +60,29 @@ describe("readBodyCapped with a deadline", () => {
     );
   });
 });
+
+describe("readBodyCapped with a signal", () => {
+  it("cancels a stalled stream and rejects when the signal aborts", async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(4));
+      },
+      pull: () => new Promise(() => undefined),
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const controller = new AbortController();
+    const reading = readBodyCapped(body, 1024, { signal: controller.signal });
+    controller.abort(new Error("deadline"));
+    await expect(reading).rejects.toThrow("deadline");
+    expect(cancelled).toBe(true);
+  });
+
+  it("rejects at once on an already aborted signal", async () => {
+    await expect(
+      readBodyCapped(new ReadableStream(), 1, { signal: AbortSignal.abort(new Error("late")) })
+    ).rejects.toThrow("late");
+  });
+});
