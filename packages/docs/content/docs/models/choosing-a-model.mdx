@@ -4,9 +4,10 @@ description: Enable models for your workspace, pick a model and effort in the co
 audience: team-owner
 owner: platform
 status: published
-lastReviewed: "2026-10-26"
+lastReviewed: "2026-11-17"
 relatedCode:
   - packages/shared/src/models.ts
+  - packages/control-plane/src/default-model.ts
   - packages/shared/src/harnesses.ts
   - packages/web/src/components/settings/integrations/slack-integration-settings.tsx
   - packages/slack-bot/src/sessions/session-launcher.ts
@@ -37,7 +38,9 @@ Settings › Models lists every model in the catalog, grouped by provider, under
 | Z.AI Coding Plan | No                 |
 | DeepSeek         | No                 |
 
-The deployment default model is Claude Sonnet 4.6 (`anthropic/claude-sonnet-4-6`). It is used when nothing else (a session, an integration setting, or an automation) picks a model.
+The deployment default model is used when nothing else (a session, an integration setting, or an automation) picks a model. It is also what the composer and the automation form preselect for someone who has not picked a model yet. Out of the box it is Claude Sonnet 4.6 (`anthropic/claude-sonnet-4-6`).
+
+To change it, set `DEFAULT_MODEL` on the control plane to a model ID from the catalog below: in `.env` on a Node host, or the Terraform variable `default_model` on Cloudflare. An ID the catalog does not know stops the control plane from starting (Node) or fails its requests (Cloudflare) until you fix it. Keep the model enabled here: a disabled default still applies, and a Node host logs a `default_model.not_enabled` warning at boot. Existing sessions keep the model they were created with. The Slack, GitHub, and Linear bots pick their own default (`*_bot_default_model`), so set those too.
 
 ## Pick a model and effort in the composer
 
