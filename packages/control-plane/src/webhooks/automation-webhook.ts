@@ -30,6 +30,7 @@ import {
 import type { Env } from "../types";
 import { createScheduler } from "../scheduler/factory";
 import { SessionFollowUpRefusedError } from "../scheduler/contracts";
+import { readWebhookBody } from "./webhook-body";
 
 /** Maximum webhook payload size (64KB). */
 const MAX_PAYLOAD_SIZE = 64 * 1024;
@@ -122,15 +123,10 @@ async function handleAutomationWebhook(
   const auth = await authenticateWebhook(request, new AutomationStore(ctx.db), automationId);
   if (!auth.ok) return auth.response;
 
-  // 3. Parse body — fast-path reject on Content-Length before reading
-  const contentLength = parseInt(request.headers.get("content-length") ?? "0", 10);
-  if (contentLength > MAX_PAYLOAD_SIZE) {
-    return error("Payload too large", 413);
-  }
-  const bodyText = await request.text();
-  if (bodyText.length > MAX_PAYLOAD_SIZE) {
-    return error("Payload too large", 413);
-  }
+  // 3. Read the body under a byte cap and a deadline
+  const read = await readWebhookBody(request, MAX_PAYLOAD_SIZE);
+  if (!read.ok) return read.response;
+  const bodyText = read.text;
 
   let body: unknown;
   try {
