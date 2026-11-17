@@ -430,6 +430,14 @@ describe("model utilities", () => {
     expect(getValidModelOrDefault("")).toBe(DEFAULT_MODEL);
   });
 
+  it("falls back to a supplied deployment default instead of the catalog default", () => {
+    expect(getValidModelOrDefault(undefined, "openai/gpt-5.5")).toBe("openai/gpt-5.5");
+    expect(getValidModelOrDefault("invalid-model", "openai/gpt-5.5")).toBe("openai/gpt-5.5");
+    expect(getValidModelOrDefault("claude-opus-4-8", "openai/gpt-5.5")).toBe(
+      "anthropic/claude-opus-4-8"
+    );
+  });
+
   it("reports reasoning support and default efforts", () => {
     expect(supportsReasoning("anthropic/claude-sonnet-4-6")).toBe(true);
     expect(supportsReasoning("claude-opus-4-8")).toBe(true);

@@ -668,9 +668,13 @@ export function getSubscriptionProviderForModel(modelId: string): SubscriptionPr
 }
 
 /**
- * Get a valid model, migrate retired Codex selections, or fall back to default.
+ * Get a valid model, migrate retired Codex selections, or fall back to `fallback`
+ * (the deployment default where one is known, else the catalog's DEFAULT_MODEL).
  * Accepts both prefixed and bare formats; always returns canonical prefixed format.
  */
-export function getValidModelOrDefault(model: string | undefined | null): ValidModel {
-  return getValidModelOrReplacement(model) ?? DEFAULT_MODEL;
+export function getValidModelOrDefault(
+  model: string | undefined | null,
+  fallback: ValidModel = DEFAULT_MODEL
+): ValidModel {
+  return getValidModelOrReplacement(model) ?? fallback;
 }

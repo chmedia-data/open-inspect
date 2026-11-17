@@ -19,6 +19,7 @@ import {
   getCodexReasoningConfig,
   getValidModelOrDefault,
   normalizeModelId,
+  type ValidModel,
 } from "./models";
 import type {
   ModelProviderSelections,
@@ -99,10 +100,14 @@ export function getHarnessLabel(harness: HarnessId): string {
 }
 
 /** Preserve explicit native model ids; only legacy harnesses substitute defaults. */
-export function resolveHarnessModel(harness: HarnessId, model?: string | null): string {
+export function resolveHarnessModel(
+  harness: HarnessId,
+  model?: string | null,
+  defaultModel?: ValidModel
+): string {
   return getHarnessCapabilities(harness).selectionPolicy === "strict"
     ? normalizeModelId(model ?? "")
-    : getValidModelOrDefault(model);
+    : getValidModelOrDefault(model, defaultModel);
 }
 
 /** Execution-time reasoning rejection is strict; legacy callers retain their effort fallback. */
