@@ -57,19 +57,22 @@ export function resolveHarnessModelSelection({
   enabledModels,
   enabledModelOptions,
   loading,
+  defaultModel,
 }: {
   harness: HarnessId;
   preference: ModelPreference;
   enabledModels: readonly string[];
   enabledModelOptions: ModelCategory[];
   loading: boolean;
+  /** The deployment default (`useEnabledModels`), for a preference naming no usable model. */
+  defaultModel?: ValidModel;
 }): HarnessModelSelection {
   const options = filterModelOptionsForHarness(harness, enabledModelOptions);
   if (loading) {
     return {
       availability: { status: "loading" },
       options,
-      ...resolveModelPreference(preference, undefined, harness),
+      ...resolveModelPreference(preference, undefined, harness, defaultModel),
     };
   }
   const models = filterModelsForHarness(harness, enabledModels);
@@ -80,12 +83,12 @@ export function resolveHarnessModelSelection({
         message: `No enabled models can run on ${getHarnessLabel(harness)}.`,
       },
       options,
-      ...resolveModelPreference(preference, undefined, harness),
+      ...resolveModelPreference(preference, undefined, harness, defaultModel),
     };
   }
   return {
     availability: { status: "available" },
     options,
-    ...resolveModelPreference(preference, models, harness),
+    ...resolveModelPreference(preference, models, harness, defaultModel),
   };
 }

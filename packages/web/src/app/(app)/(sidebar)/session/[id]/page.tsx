@@ -28,7 +28,7 @@ import {
   type SessionListResponse,
 } from "@/lib/session-list";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { DEFAULT_MODEL, type ReasoningEffort, type ValidModel } from "@open-inspect/shared/models";
+import type { ReasoningEffort, ValidModel } from "@open-inspect/shared/models";
 import type { ModelPreference } from "@/lib/model-selection";
 import { getHarnessReasoningConfig, type HarnessId } from "@open-inspect/shared/harnesses";
 import { resolveHarnessModelSelection } from "@/lib/session-harness";
@@ -670,8 +670,13 @@ function useSessionListActions(sessionId: string) {
 function useModelSelection(sessionState: SessionState, harness: HarnessId) {
   const [modelPreferenceDraft, setModelPreferenceDraft] = useState<ModelPreference | null>(null);
 
-  const { enabledModels, enabledModelOptions, loading: loadingEnabledModels } = useEnabledModels();
-  const sessionModel = sessionState?.model ?? DEFAULT_MODEL;
+  const {
+    enabledModels,
+    defaultModel,
+    enabledModelOptions,
+    loading: loadingEnabledModels,
+  } = useEnabledModels();
+  const sessionModel = sessionState?.model ?? defaultModel;
   const sessionReasoningEffort =
     sessionState?.reasoningEffort ?? getHarnessReasoningConfig(harness, sessionModel)?.default;
   const {
@@ -690,8 +695,10 @@ function useModelSelection(sessionState: SessionState, harness: HarnessId) {
         enabledModels,
         enabledModelOptions,
         loading: loadingEnabledModels,
+        defaultModel,
       }),
     [
+      defaultModel,
       enabledModelOptions,
       enabledModels,
       harness,

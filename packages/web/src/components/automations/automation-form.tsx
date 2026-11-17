@@ -58,7 +58,12 @@ export function AutomationForm({
   const scopeValid = mode === "edit" || automationOwnerSelectable(teamId, scope, requireTeam);
   const { repos, loading: loadingRepos } = useRepos(true, teamId);
   const { environments, loading: loadingEnvironments } = useEnvironments({ ownerTeamId: teamId });
-  const { enabledModels, enabledModelOptions, loading: loadingModels } = useEnabledModels();
+  const {
+    enabledModels,
+    defaultModel,
+    enabledModelOptions,
+    loading: loadingModels,
+  } = useEnabledModels();
   const providerAccounts = useProviderAccounts();
   const initialDraft = useMemo(() => createAutomationFormDraft(initialValues), [initialValues]);
   const initialRepositories = useMemo(
@@ -113,8 +118,9 @@ export function AutomationForm({
         enabledModels,
         enabledModelOptions,
         loading: loadingModels,
+        defaultModel,
       }),
-    [agent.harness, agent.model, enabledModelOptions, enabledModels, loadingModels]
+    [agent.harness, agent.model, defaultModel, enabledModelOptions, enabledModels, loadingModels]
   );
   const resolvedModel = modelSelection.model;
   const modelError =

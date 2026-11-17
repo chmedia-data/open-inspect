@@ -12,7 +12,8 @@ import {
 } from "@open-inspect/shared/models";
 
 export interface ModelPreference {
-  model: string;
+  /** Unset means no preference: the deployment default applies. */
+  model?: string;
   reasoningEffort?: string;
 }
 
@@ -24,15 +25,16 @@ export interface ResolvedModelPreference {
 export function resolveModelPreference(
   preference: ModelPreference,
   enabledModels?: readonly string[],
-  harness: HarnessId = DEFAULT_HARNESS
+  harness: HarnessId = DEFAULT_HARNESS,
+  defaultModel: ValidModel = DEFAULT_MODEL
 ): ResolvedModelPreference {
   const model = enabledModels
     ? resolveEnabledModel({
         model: preference.model,
         enabledModels,
-        fallbackModel: DEFAULT_MODEL,
+        fallbackModel: defaultModel,
       })
-    : getValidModelOrDefault(preference.model);
+    : getValidModelOrDefault(preference.model, defaultModel);
   // Efforts differ by harness (Codex offers `max` where the generic catalog does not).
   const reasoningConfig = getHarnessReasoningConfig(harness, model);
   return {

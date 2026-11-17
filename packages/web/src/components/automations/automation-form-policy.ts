@@ -16,7 +16,6 @@ import {
   type AutomationRepositoryInput,
 } from "@open-inspect/shared/types/automations";
 import { isValidHarnessReasoningEffort } from "@open-inspect/shared/harnesses";
-import { DEFAULT_MODEL } from "@open-inspect/shared/models";
 import {
   getValidHarnessOrDefault,
   reconcileProviderSelectionsForHarness,
@@ -137,7 +136,8 @@ export function createAutomationFormDraft(
     },
     agent: {
       harness,
-      model: initialValues.model ?? DEFAULT_MODEL,
+      // Empty until the user picks one: the form resolves it to the deployment default.
+      model: initialValues.model ?? "",
       reasoningEffort: initialValues.reasoningEffort ?? "",
     },
   };

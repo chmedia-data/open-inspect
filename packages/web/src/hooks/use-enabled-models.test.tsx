@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { SWRConfig, useSWRConfig } from "swr";
-import { DEFAULT_ENABLED_MODELS } from "@open-inspect/shared/models";
+import { DEFAULT_ENABLED_MODELS, DEFAULT_MODEL } from "@open-inspect/shared/models";
 import { MODEL_PREFERENCES_KEY, useEnabledModels } from "./use-enabled-models";
 
 afterEach(() => {
@@ -13,14 +13,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function wrapper(enabledModels: unknown) {
+function wrapper(enabledModels: unknown, defaultModel?: unknown) {
   return function TestWrapper({ children }: { children: ReactNode }) {
     return (
       <SWRConfig
         value={{
           provider: () => new Map(),
           fallback: {
-            [MODEL_PREFERENCES_KEY]: { enabledModels, revision: 1 },
+            [MODEL_PREFERENCES_KEY]: { enabledModels, revision: 1, defaultModel },
           },
           revalidateIfStale: false,
         }}
@@ -38,6 +38,23 @@ describe("useEnabledModels", () => {
     });
     expect(result.current.enabledModels).toEqual(["openai/gpt-5.4"]);
   });
+
+  it("exposes the deployment default model the control plane reports", () => {
+    const { result } = renderHook(() => useEnabledModels(), {
+      wrapper: wrapper(["openai/gpt-5.4"], "openai/gpt-5.4"),
+    });
+    expect(result.current.defaultModel).toBe("openai/gpt-5.4");
+  });
+
+  it.each([undefined, "not-a-model"])(
+    "uses the catalog default when the reported default is %s",
+    (defaultModel) => {
+      const { result } = renderHook(() => useEnabledModels(), {
+        wrapper: wrapper(["openai/gpt-5.4"], defaultModel),
+      });
+      expect(result.current.defaultModel).toBe(DEFAULT_MODEL);
+    }
+  );
 
   it("falls back to defaults when the response has no valid models", () => {
     const { result } = renderHook(() => useEnabledModels(), {

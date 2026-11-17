@@ -58,6 +58,7 @@ const mocks = vi.hoisted(() => {
       }>;
     }>,
     enabledModelsValue: [] as string[],
+    defaultModelValue: undefined as string | undefined,
     enabledModelsLoadingValue: false,
     enabledModelOptionsValue: [] as Array<{
       category: string;
@@ -222,6 +223,7 @@ vi.mock("@/hooks/use-branches", () => ({
 vi.mock("@/hooks/use-enabled-models", () => ({
   useEnabledModels: () => ({
     enabledModels: mocks.enabledModelsValue,
+    defaultModel: mocks.defaultModelValue,
     enabledModelOptions: mocks.enabledModelOptionsValue,
     loading: mocks.enabledModelsLoadingValue,
   }),
@@ -266,6 +268,7 @@ beforeEach(() => {
   mocks.environmentsLoadingValue = false;
   mocks.environmentsValue = [];
   mocks.enabledModelsValue = [DEFAULT_MODEL];
+  mocks.defaultModelValue = undefined;
   mocks.enabledModelsLoadingValue = false;
   mocks.enabledModelOptionsValue = [
     {

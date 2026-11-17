@@ -57,6 +57,7 @@ vi.mock("@/hooks/use-session-rename", () => ({
 vi.mock("@/hooks/use-enabled-models", () => ({
   useEnabledModels: () => ({
     enabledModels: mocks.enabledModels,
+    defaultModel: "anthropic/claude-sonnet-4-6",
     enabledModelOptions: [],
     loading: false,
   }),
