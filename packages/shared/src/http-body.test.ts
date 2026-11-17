@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readBodyCapped } from "./http-body";
+import { BodyReadTimeoutError, readBodyCapped } from "./http-body";
 
 function streamOf(...chunks: Uint8Array[]): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({
@@ -36,5 +36,27 @@ describe("readBodyCapped", () => {
     });
     expect(await readBodyCapped(stream, 7)).toBeNull();
     expect(cancelled).toBe(true);
+  });
+});
+
+describe("readBodyCapped with a deadline", () => {
+  it("cancels a body that stalls past the deadline", async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1]));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    await expect(readBodyCapped(stream, 10, 20)).rejects.toBeInstanceOf(BodyReadTimeoutError);
+    expect(cancelled).toBe(true);
+  });
+
+  it("reads a body that finishes before the deadline", async () => {
+    expect(await readBodyCapped(streamOf(new Uint8Array([1, 2])), 10, 1000)).toEqual(
+      new Uint8Array([1, 2])
+    );
   });
 });
