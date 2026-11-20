@@ -6,7 +6,10 @@ import {
   type McpCredential,
   type McpGrantBinding,
 } from "../db/mcp-connections";
-import type { McpServerMetadata } from "@open-inspect/shared/types/integrations";
+import {
+  MCP_OAUTH_LOOPBACK_REDIRECT_URI,
+  type McpServerMetadata,
+} from "@open-inspect/shared/types/integrations";
 import { mcpDestination, mcpDestinationInRegistrableDomain } from "./destination";
 import { McpError } from "./errors";
 
@@ -137,6 +140,14 @@ export class McpOAuthService {
     const target = mcpDestination(server.url!);
     const issuer = mcpDestination(server.oauth.issuer);
     if (resource.href !== target.href) throw new McpError("mcp_unsupported");
+    // Plain-http redirects are limited to the fixed loopback URI, and only for servers opted into it.
+    const loopback = server.oauth.redirect === "loopback";
+    if (
+      loopback
+        ? redirectUri !== MCP_OAUTH_LOOPBACK_REDIRECT_URI
+        : new URL(redirectUri).protocol !== "https:"
+    )
+      throw new McpError("mcp_unsupported");
     const current = await this.store.getClient(server.id);
     if (
       current &&

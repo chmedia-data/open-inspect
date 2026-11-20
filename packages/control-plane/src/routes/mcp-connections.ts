@@ -10,6 +10,7 @@ import { McpOAuthService } from "../mcp/oauth";
 import { McpError, mcpErrorResponse } from "../mcp/errors";
 import { parseBody } from "./body";
 import { requireRepoSecretsEncryptionKey, requireTokenEncryptionKey } from "../env-validation";
+import { MCP_OAUTH_LOOPBACK_REDIRECT_URI } from "@open-inspect/shared/types/integrations";
 
 const self = admit({
   ...SCM_AGNOSTIC_HUMAN_USER_ROUTE,
@@ -38,6 +39,7 @@ async function list(_request: Request, env: Env, _params: object, ctx: UserRoute
           name: server.name,
           enabled: server.enabled && server.authMode === "user_oauth",
           authMode: server.authMode,
+          redirect: server.oauth?.redirect ?? "web",
           status: !row
             ? "not_connected"
             : row.status === "disconnected"
@@ -63,14 +65,18 @@ async function connect(
     const { registry, oauth } = services(ctx, env);
     const server = await registry.get(params.serverId);
     if (!server || !ctx.authentication?.credentialId) throw new McpError("mcp_denied");
-    const callback = new URL("/api/mcp-connections/oauth/callback", env.WEB_APP_URL);
-    if (callback.protocol !== "https:") throw new McpError("mcp_unsupported");
+    let redirectUri = MCP_OAUTH_LOOPBACK_REDIRECT_URI;
+    if (server.oauth?.redirect !== "loopback") {
+      const callback = new URL("/api/mcp-connections/oauth/callback", env.WEB_APP_URL);
+      if (callback.protocol !== "https:") throw new McpError("mcp_unsupported");
+      redirectUri = callback.toString();
+    }
     return Response.json({
       authorizationUrl: await oauth.start(
         ctx.principal.userId,
         ctx.authentication.credentialId,
         server,
-        callback.toString()
+        redirectUri
       ),
     });
   } catch (error) {
