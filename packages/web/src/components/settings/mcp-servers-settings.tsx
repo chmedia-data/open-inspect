@@ -505,8 +505,8 @@ function McpServerForm({
                 Use localhost redirect (paste-back)
               </Label>
               <p className="text-xs text-muted-foreground">
-                For providers that only accept localhost redirects, such as Atlassian Rovo. Users
-                finish connecting by pasting the localhost address their browser lands on.
+                For providers that only accept localhost redirect URIs. Users finish connecting by
+                pasting the localhost address their browser lands on.
               </p>
               <p className="text-xs text-muted-foreground">
                 Users connect their accounts in Personal → Connections. Supported servers use

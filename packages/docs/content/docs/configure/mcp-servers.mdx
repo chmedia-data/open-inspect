@@ -82,6 +82,8 @@ A routed server must speak Streamable HTTP at a public HTTPS URL: no IP address,
 
 For **Each user's OAuth connection**, also enter the **OAuth issuer**. Leave **OAuth resource** blank: it defaults to the server URL, and connecting fails for any other value. When you change an existing server's URL, clear **OAuth resource** or set it to the new URL. The server must publish OAuth metadata that names that issuer and resource exactly, keep its token and registration endpoints on the issuer's origin and its authorization endpoint on the issuer's registrable domain (for example `foo.test` for an issuer at `api.foo.test`), and support dynamic client registration for a public client with S256 PKCE.
 
+Some providers register clients only for `localhost` redirect URIs and refuse the web app's callback. For those, turn on **Use localhost redirect (paste-back)**. OpenInspect then registers and authorizes with the fixed redirect `http://localhost:33418/callback`, and users finish connecting by pasting that address back into settings; see [Personal connections](#personal-connections). Leave it off for every other server. Turning it on or off does not mark existing connections **Reconnect required**: they keep working, and the next **Connect** registers a new client for the new redirect. API clients set it with `"redirect": "loopback"` in the `oauth` object.
+
 ## Saved credentials
 
 Environment variables and headers are credentials: they are stored encrypted on the server side. A local server's environment variables and an unrouted remote server's headers are injected into the session when the server is prepared; a routed server's headers stay in the control plane. They are write-only. After you save a value, neither the settings page nor the API returns it to anyone.
@@ -115,6 +117,8 @@ A server cannot be deleted while users have personal connections to it. Turn it 
 ## Personal connections
 
 When a server uses **Each user's OAuth connection**, each person connects their own account under Settings › Connections (**Your MCP connections**). Click **Connect** and approve access at the service. **Reconnect** keeps the current connection working until the new approval completes. **Disconnect** stops use through OpenInspect but does not revoke the account at the external service. Connecting requires the web app to be served over HTTPS.
+
+For a server that uses the localhost redirect, **Connect** does not leave the settings page. Instead it shows **Open the sign-in page** and a **Redirect URL** field. Approve access in the new tab; the browser then lands on a `http://localhost:33418/callback?...` page saying the site can't be reached. That is expected. Copy the full address from that tab and paste it into **Redirect URL**, then click **Complete connection** within ten minutes of clicking **Connect**, in the same browser. The address carries a one-time authorization code, so don't share it.
 
 In a session, the server acts as the person whose prompt is running. Only prompts a person sends from the web or Slack can use personal connections; turns started by automations, GitHub, or Linear cannot. Before forwarding each call, OpenInspect checks that this person is not suspended and can still read and collaborate in the session. When several people prompt one session, each turn uses its own author's connection. A child session uses the connection only when the parent session's own agent spawned it. The proxy authenticates the sandbox, not the process inside it, so a process left running from an earlier turn can make calls with the active author's connection during that author's turn. Don't use personal connections in a session shared with people or prompts you don't trust.
 
@@ -189,6 +193,9 @@ See [lifecycle scripts](/configure/lifecycle-scripts) and [prebuilt images](/con
     resource** blank, and confirm the server supports public-client OAuth. If returning from the
     service shows "Connection was not completed. Please try connecting again.", the approval was
     declined or expired, or the token exchange failed; connect again.
+    For a localhost-redirect server, "Paste the full localhost address shown after signing in." means
+    the pasted text is not the `http://localhost:33418/callback` address with its `code` and `state`;
+    copy the whole address bar again.
 
 </Accordion>
   <Accordion title="A local server is slow to start or its package could not be installed">
