@@ -16,8 +16,6 @@ import { SUBSCRIPTION_PROVIDER_IDS, type SubscriptionProviderId } from "./types/
  */
 export type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh" | "max";
 
-const GPT_5_6_DEFAULT_REASONING_EFFORT: ReasoningEffort = "medium";
-
 export interface ModelReasoningConfig {
   efforts: ReasoningEffort[];
   default: ReasoningEffort | undefined;
@@ -163,55 +161,6 @@ export const MODEL_CATALOG = [
     enabledByDefault: true,
     models: [
       {
-        id: "openai/gpt-5.4",
-        name: "GPT 5.4",
-        description: "Flagship model",
-        reasoning: {
-          efforts: ["none", "low", "medium", "high", "xhigh"],
-          default: undefined,
-        },
-      },
-      {
-        id: "openai/gpt-5.5",
-        codex: { default: "medium" },
-        name: "GPT 5.5",
-        description: "Latest flagship model",
-        reasoning: {
-          efforts: ["none", "low", "medium", "high", "xhigh"],
-          default: undefined,
-        },
-      },
-      {
-        id: "openai/gpt-5.6-sol",
-        codex: { additionalEfforts: ["max"], default: "low" },
-        name: "GPT 5.6 Sol",
-        description: "Frontier model for complex professional work",
-        reasoning: {
-          efforts: ["none", "low", "medium", "high", "xhigh"],
-          default: GPT_5_6_DEFAULT_REASONING_EFFORT,
-        },
-      },
-      {
-        id: "openai/gpt-5.6-terra",
-        codex: { additionalEfforts: ["max"] },
-        name: "GPT 5.6 Terra",
-        description: "Balanced, cost-efficient everyday work",
-        reasoning: {
-          efforts: ["none", "low", "medium", "high", "xhigh"],
-          default: GPT_5_6_DEFAULT_REASONING_EFFORT,
-        },
-      },
-      {
-        id: "openai/gpt-5.6-luna",
-        codex: {},
-        name: "GPT 5.6 Luna",
-        description: "Fast, cost-efficient high-volume workloads",
-        reasoning: {
-          efforts: ["none", "low", "medium", "high", "xhigh", "max"],
-          default: GPT_5_6_DEFAULT_REASONING_EFFORT,
-        },
-      },
-      {
         id: "openai/gpt-6-astra",
         codex: { default: "low" },
         name: "GPT-6 Astra",
@@ -248,6 +197,26 @@ export const MODEL_CATALOG = [
         description: "Visual reasoning, computer use, and natural writing",
         reasoning: {
           efforts: ["none", "low", "medium", "high", "xhigh", "max"],
+          default: "medium",
+        },
+      },
+      {
+        id: "openai/gpt-6.2-astra",
+        codex: { default: "low" },
+        name: "GPT-6.2 Astra",
+        description: "Most capable model for the hardest projects",
+        reasoning: {
+          efforts: ["low", "medium", "high", "xhigh", "max"],
+          default: "medium",
+        },
+      },
+      {
+        id: "openai/gpt-6.2-sol",
+        codex: { default: "low" },
+        name: "GPT-6.2 Sol",
+        description: "Everyday coding and agents at scale",
+        reasoning: {
+          efforts: ["low", "medium", "high", "xhigh", "max"],
           default: "medium",
         },
       },
@@ -498,6 +467,16 @@ export const MODEL_CATALOG = [
     enabledByDefault: false,
     models: [
       {
+        id: "amazon-bedrock/global.openai.gpt-6.2-astra",
+        name: "GPT-6.2 Astra",
+        description: "Bedrock global",
+      },
+      {
+        id: "amazon-bedrock/global.openai.gpt-6.2-sol",
+        name: "GPT-6.2 Sol",
+        description: "Bedrock global",
+      },
+      {
         id: "amazon-bedrock/global.openai.gpt-6.1-sol",
         name: "GPT-6.1 Sol",
         description: "Bedrock global",
@@ -520,11 +499,6 @@ export const MODEL_CATALOG = [
       {
         id: "amazon-bedrock/global.openai.gpt-6-luna",
         name: "GPT-6 Luna",
-        description: "Bedrock global",
-      },
-      {
-        id: "amazon-bedrock/global.openai.gpt-5.6-sol",
-        name: "GPT-5.6 Sol",
         description: "Bedrock global",
       },
       {
@@ -654,12 +628,20 @@ export function isValidModel(model: string): model is ValidModel {
   return VALID_MODELS.includes(normalizeModelId(model) as ValidModel);
 }
 
+/** Retired selections still stored in sessions, defaults, bot settings and automations. */
+const RETIRED_MODEL_REPLACEMENTS: ReadonlyMap<string, ValidModel> = new Map([
+  ["openai/gpt-5.3-codex", "openai/gpt-6-sol"],
+  ["openai/gpt-5.3-codex-spark", "openai/gpt-6-sol"],
+  ["openai/gpt-5.4", "openai/gpt-6.2-sol"],
+  ["openai/gpt-5.5", "openai/gpt-6.2-sol"],
+  ["openai/gpt-5.6-sol", "openai/gpt-6.2-sol"],
+  ["openai/gpt-5.6-terra", "openai/gpt-6.1-terra"],
+  ["openai/gpt-5.6-luna", "openai/gpt-6-luna"],
+  ["amazon-bedrock/global.openai.gpt-5.6-sol", "amazon-bedrock/global.openai.gpt-6.2-sol"],
+]);
+
 function retiredModelReplacement(model: string): ValidModel | undefined {
-  const normalized = normalizeModelId(model);
-  if (normalized === "openai/gpt-5.3-codex" || normalized === "openai/gpt-5.3-codex-spark") {
-    return "openai/gpt-6-sol";
-  }
-  return undefined;
+  return RETIRED_MODEL_REPLACEMENTS.get(normalizeModelId(model));
 }
 
 /** Normalize a supported or retired model selection without choosing a default. */

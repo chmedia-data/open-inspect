@@ -55,15 +55,12 @@ OpenAI models support connected ChatGPT provider accounts or `OPENAI_API_KEY` mo
 
 | Model ID               | Display name  | Description                                         | Reasoning efforts                   | Default effort |
 | ---------------------- | ------------- | --------------------------------------------------- | ----------------------------------- | -------------- |
-| `openai/gpt-5.4`       | GPT 5.4       | Flagship model                                      | none, low, medium, high, xhigh      | Not set        |
-| `openai/gpt-5.5`       | GPT 5.5       | Latest flagship model                               | none, low, medium, high, xhigh      | Not set        |
-| `openai/gpt-5.6-sol`   | GPT 5.6 Sol   | Frontier model for complex professional work        | none, low, medium, high, xhigh      | medium         |
-| `openai/gpt-5.6-terra` | GPT 5.6 Terra | Balanced, cost-efficient everyday work              | none, low, medium, high, xhigh      | medium         |
-| `openai/gpt-5.6-luna`  | GPT 5.6 Luna  | Fast, cost-efficient high-volume workloads          | none, low, medium, high, xhigh, max | medium         |
 | `openai/gpt-6-astra`   | GPT-6 Astra   | Most capable model for complex, demanding work      | low, medium, high, xhigh, max       | medium         |
 | `openai/gpt-6-sol`     | GPT-6 Sol     | Complex coding and agentic workflows                | none, low, medium, high, xhigh, max | medium         |
 | `openai/gpt-6.1-sol`   | GPT-6.1 Sol   | Complex coding, computer use, and professional work | low, medium, high, xhigh, max       | medium         |
 | `openai/gpt-6.1-terra` | GPT-6.1 Terra | Visual reasoning, computer use, and natural writing | none, low, medium, high, xhigh, max | medium         |
+| `openai/gpt-6.2-astra` | GPT-6.2 Astra | Most capable model for the hardest projects         | low, medium, high, xhigh, max       | medium         |
+| `openai/gpt-6.2-sol`   | GPT-6.2 Sol   | Everyday coding and agents at scale                 | low, medium, high, xhigh, max       | medium         |
 | `openai/gpt-6-luna`    | GPT-6 Luna    | Efficient model for focused, high-volume tasks      | none, low, medium, high, xhigh, max | medium         |
 
 ## xAI / SuperGrok
@@ -227,12 +224,13 @@ Global inference profiles: AWS may serve a request from any region.
 
 | Model ID                                     | Display name  | Description    | Reasoning efforts | Default effort |
 | -------------------------------------------- | ------------- | -------------- | ----------------- | -------------- |
+| `amazon-bedrock/global.openai.gpt-6.2-astra` | GPT-6.2 Astra | Bedrock global | Not supported     | N/A            |
+| `amazon-bedrock/global.openai.gpt-6.2-sol`   | GPT-6.2 Sol   | Bedrock global | Not supported     | N/A            |
 | `amazon-bedrock/global.openai.gpt-6.1-sol`   | GPT-6.1 Sol   | Bedrock global | Not supported     | N/A            |
 | `amazon-bedrock/global.openai.gpt-6.1-terra` | GPT-6.1 Terra | Bedrock global | Not supported     | N/A            |
 | `amazon-bedrock/global.openai.gpt-6-sol`     | GPT-6 Sol     | Bedrock global | Not supported     | N/A            |
 | `amazon-bedrock/global.openai.gpt-6-astra`   | GPT-6 Astra   | Bedrock global | Not supported     | N/A            |
 | `amazon-bedrock/global.openai.gpt-6-luna`    | GPT-6 Luna    | Bedrock global | Not supported     | N/A            |
-| `amazon-bedrock/global.openai.gpt-5.6-sol`   | GPT-5.6 Sol   | Bedrock global | Not supported     | N/A            |
 | `amazon-bedrock/global.moonshotai.kimi-k3.1` | Kimi K3.1     | Bedrock global | Not supported     | N/A            |
 | `amazon-bedrock/global.moonshotai.kimi-k3`   | Kimi K3       | Bedrock global | Not supported     | N/A            |
 | `amazon-bedrock/global.xai.grok-4.7`         | Grok 4.7      | Bedrock global | Not supported     | N/A            |

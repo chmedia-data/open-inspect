@@ -13,9 +13,19 @@ can use the installation default, select a specific account, or explicitly use A
 See [Available Models — OpenAI](AVAILABLE_MODELS.md#openai) for supported model IDs, reasoning
 effort options, and defaults.
 
-Existing sessions and saved bot settings selecting `gpt-5.3-codex` or `gpt-5.3-codex-spark` resolve
-to `openai/gpt-6-sol` when used. The retired models are no longer offered in the picker; update
-saved defaults and automations to a model available to your account.
+Existing sessions, saved defaults, bot settings and automations that select a retired model resolve
+to a GPT-6 successor when used:
+
+| Retired model                              | Resolves to                                |
+| ------------------------------------------ | ------------------------------------------ |
+| `gpt-5.3-codex`, `gpt-5.3-codex-spark`     | `openai/gpt-6-sol`                         |
+| `gpt-5.4`, `gpt-5.5`, `gpt-5.6-sol`        | `openai/gpt-6.2-sol`                       |
+| `gpt-5.6-terra`                            | `openai/gpt-6.1-terra`                     |
+| `gpt-5.6-luna`                             | `openai/gpt-6-luna`                        |
+| `amazon-bedrock/global.openai.gpt-5.6-sol` | `amazon-bedrock/global.openai.gpt-6.2-sol` |
+
+The retired models are no longer offered in the picker; update saved defaults and automations to a
+model available to your account.
 
 ---
 

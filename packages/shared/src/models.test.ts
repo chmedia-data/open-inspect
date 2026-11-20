@@ -40,15 +40,12 @@ const ANTHROPIC_MODELS = [
 ] as const;
 
 const OPENAI_MODELS = [
-  "openai/gpt-5.4",
-  "openai/gpt-5.5",
-  "openai/gpt-5.6-sol",
-  "openai/gpt-5.6-terra",
-  "openai/gpt-5.6-luna",
   "openai/gpt-6-astra",
   "openai/gpt-6-sol",
   "openai/gpt-6.1-sol",
   "openai/gpt-6.1-terra",
+  "openai/gpt-6.2-astra",
+  "openai/gpt-6.2-sol",
   "openai/gpt-6-luna",
 ] as const;
 
@@ -231,7 +228,7 @@ describe("model utilities", () => {
     expect(normalizeModelId("claude-fable-5")).toBe("anthropic/claude-fable-5");
     expect(normalizeModelId("claude-fable-5-1")).toBe("anthropic/claude-fable-5-1");
     expect(normalizeModelId("gpt-6-sol")).toBe("openai/gpt-6-sol");
-    expect(normalizeModelId("gpt-5.6-sol")).toBe("openai/gpt-5.6-sol");
+    expect(normalizeModelId("gpt-6.2-sol")).toBe("openai/gpt-6.2-sol");
     expect(isValidModel("claude-sonnet-4-6")).toBe(true);
     expect(isValidModel("claude-opus-4-8")).toBe(true);
     expect(isValidModel("claude-opus-5")).toBe(true);
@@ -239,20 +236,21 @@ describe("model utilities", () => {
     expect(isValidModel("claude-fable-5")).toBe(true);
     expect(isValidModel("claude-fable-5-1")).toBe(true);
     expect(isValidModel("gpt-6-sol")).toBe(true);
-    expect(isValidModel("gpt-5.6-sol")).toBe(true);
+    expect(isValidModel("gpt-6.2-sol")).toBe(true);
+    expect(isValidModel("gpt-5.6-sol")).toBe(false);
   });
 
   it("normalizes, filters, and deduplicates model lists", () => {
     expect(
       normalizeValidModels([
-        "openai/gpt-5.4",
+        "openai/gpt-6.2-sol",
         "gpt-5.3-codex",
         "openai/gpt-5.2",
         "openai/gpt-5.3-codex-spark",
         "unknown/model",
         "anthropic/claude-sonnet-4-6",
       ])
-    ).toEqual(["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"]);
+    ).toEqual(["openai/gpt-6.2-sol", "anthropic/claude-sonnet-4-6"]);
     expect(normalizeValidModels(["openai/gpt-5.2", "unknown/model"])).toEqual([]);
     expect(normalizeValidModels([])).toEqual([]);
   });
@@ -260,23 +258,23 @@ describe("model utilities", () => {
   it("applies model preference changes as an ordered set", () => {
     expect(
       applyModelPreferenceChanges(
-        ["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"],
+        ["openai/gpt-6.2-sol", "anthropic/claude-sonnet-4-6"],
         [
-          { modelId: "openai/gpt-5.4", enabled: false },
+          { modelId: "openai/gpt-6.2-sol", enabled: false },
           { modelId: "anthropic/claude-haiku-4-5", enabled: true },
-          { modelId: "openai/gpt-5.4", enabled: true },
+          { modelId: "openai/gpt-6.2-sol", enabled: true },
         ]
       )
-    ).toEqual(["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-4-5", "openai/gpt-5.4"]);
+    ).toEqual(["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-4-5", "openai/gpt-6.2-sol"]);
   });
 
   it("keeps enabled no-op changes in their existing position", () => {
     expect(
       applyModelPreferenceChanges(
-        ["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"],
-        [{ modelId: "openai/gpt-5.4", enabled: true }]
+        ["openai/gpt-6.2-sol", "anthropic/claude-sonnet-4-6"],
+        [{ modelId: "openai/gpt-6.2-sol", enabled: true }]
       )
-    ).toEqual(["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"]);
+    ).toEqual(["openai/gpt-6.2-sol", "anthropic/claude-sonnet-4-6"]);
   });
 
   it("resolves models using the shared enabled-model fallback policy", () => {
@@ -290,44 +288,44 @@ describe("model utilities", () => {
     expect(
       resolveEnabledModel({
         model: "claude-opus-4-8",
-        fallbackModel: "gpt-5.4",
-        enabledModels: ["openai/gpt-5.2", "anthropic/claude-opus-4-8", "openai/gpt-5.4"],
+        fallbackModel: "gpt-6.2-sol",
+        enabledModels: ["openai/gpt-5.2", "anthropic/claude-opus-4-8", "openai/gpt-6.2-sol"],
       })
     ).toBe("anthropic/claude-opus-4-8");
     expect(
       resolveEnabledModel({
         model: "anthropic/claude-opus-4-8",
-        fallbackModel: "gpt-5.4",
-        enabledModels: ["openai/gpt-5.2", "openai/gpt-5.4"],
+        fallbackModel: "gpt-6.2-sol",
+        enabledModels: ["openai/gpt-5.2", "openai/gpt-6.2-sol"],
       })
-    ).toBe("openai/gpt-5.4");
+    ).toBe("openai/gpt-6.2-sol");
     expect(
       resolveEnabledModel({
         model: "anthropic/claude-opus-4-8",
         fallbackModel: "anthropic/claude-sonnet-4-6",
-        enabledModels: ["openai/gpt-5.2", "gpt-5.5"],
+        enabledModels: ["openai/gpt-5.2", "gpt-6.1-sol"],
       })
-    ).toBe("openai/gpt-5.5");
+    ).toBe("openai/gpt-6.1-sol");
     expect(
       resolveEnabledModel({
         model: "anthropic/claude-opus-4-8",
-        fallbackModel: "openai/gpt-5.4",
+        fallbackModel: "openai/gpt-6.2-sol",
         enabledModels: ["openai/gpt-5.2"],
       })
-    ).toBe("openai/gpt-5.4");
+    ).toBe("openai/gpt-6.2-sol");
     expect(
       resolveEnabledModel({
         model: "anthropic/claude-opus-4-8",
-        fallbackModel: "openai/gpt-5.4",
+        fallbackModel: "openai/gpt-6.2-sol",
       })
     ).toBe("anthropic/claude-opus-4-8");
     expect(
       resolveEnabledModel({
         model: "anthropic/claude-opus-4-8",
-        fallbackModel: "openai/gpt-5.4",
+        fallbackModel: "openai/gpt-6.2-sol",
         enabledModels: [],
       })
-    ).toBe("openai/gpt-5.4");
+    ).toBe("openai/gpt-6.2-sol");
   });
 
   it("rejects invalid, legacy, empty, and case-mismatched models", () => {
@@ -380,7 +378,7 @@ describe("model utilities", () => {
   });
 
   it("strictly derives subscription providers from canonical catalog routes", () => {
-    expect(getSubscriptionProviderForModel("openai/gpt-5.6-sol")).toBe("openai");
+    expect(getSubscriptionProviderForModel("openai/gpt-6.2-sol")).toBe("openai");
     expect(getSubscriptionProviderForModel("xai/grok-4.6")).toBe("xai");
     expect(getSubscriptionProviderForModel("anthropic/claude-sonnet-4-6")).toBe("anthropic");
     expect(getSubscriptionProviderForModel("deepseek/deepseek-v4-pro")).toBeNull();
@@ -388,13 +386,13 @@ describe("model utilities", () => {
 
   it("rejects bare, malformed, and unknown billing model routes", () => {
     for (const model of [
-      "gpt-5.6-sol",
+      "gpt-6.2-sol",
       "claude-sonnet-4-6",
       "openai",
-      "/gpt-5.6-sol",
+      "/gpt-6.2-sol",
       "openai/",
-      "openai/gpt-5.6-sol/extra",
-      "OpenAI/gpt-5.6-sol",
+      "openai/gpt-6.2-sol/extra",
+      "OpenAI/gpt-6.2-sol",
       "openai/not-in-catalog",
       "unknown/model",
       "",
@@ -404,10 +402,22 @@ describe("model utilities", () => {
   });
 
   it("recognizes valid and retired selections without substituting a default", () => {
-    expect(getValidModelOrReplacement("gpt-5.4")).toBe("openai/gpt-5.4");
+    expect(getValidModelOrReplacement("gpt-6.2-sol")).toBe("openai/gpt-6.2-sol");
     for (const model of ["openai/gpt-5.3-codex", "gpt-5.3-codex-spark"]) {
       expect(getValidModelOrReplacement(model)).toBe("openai/gpt-6-sol");
     }
+    for (const [model, replacement] of [
+      ["openai/gpt-5.4", "openai/gpt-6.2-sol"],
+      ["gpt-5.5", "openai/gpt-6.2-sol"],
+      ["openai/gpt-5.6-sol", "openai/gpt-6.2-sol"],
+      ["openai/gpt-5.6-terra", "openai/gpt-6.1-terra"],
+      ["gpt-5.6-luna", "openai/gpt-6-luna"],
+      ["amazon-bedrock/global.openai.gpt-5.6-sol", "amazon-bedrock/global.openai.gpt-6.2-sol"],
+    ]) {
+      expect(isValidModel(model)).toBe(false);
+      expect(getValidModelOrReplacement(model)).toBe(replacement);
+    }
+    expect(getValidModelOrReplacement("constructor")).toBeUndefined();
     for (const model of ["openai/gpt-5.2", "invalid-model", "", null, undefined]) {
       expect(getValidModelOrReplacement(model)).toBeUndefined();
     }
@@ -431,9 +441,11 @@ describe("model utilities", () => {
   });
 
   it("falls back to a supplied deployment default instead of the catalog default", () => {
-    expect(getValidModelOrDefault(undefined, "openai/gpt-5.5")).toBe("openai/gpt-5.5");
-    expect(getValidModelOrDefault("invalid-model", "openai/gpt-5.5")).toBe("openai/gpt-5.5");
-    expect(getValidModelOrDefault("claude-opus-4-8", "openai/gpt-5.5")).toBe(
+    expect(getValidModelOrDefault(undefined, "openai/gpt-6.1-sol")).toBe("openai/gpt-6.1-sol");
+    expect(getValidModelOrDefault("invalid-model", "openai/gpt-6.1-sol")).toBe(
+      "openai/gpt-6.1-sol"
+    );
+    expect(getValidModelOrDefault("claude-opus-4-8", "openai/gpt-6.1-sol")).toBe(
       "anthropic/claude-opus-4-8"
     );
   });
@@ -441,8 +453,8 @@ describe("model utilities", () => {
   it("reports reasoning support and default efforts", () => {
     expect(supportsReasoning("anthropic/claude-sonnet-4-6")).toBe(true);
     expect(supportsReasoning("claude-opus-4-8")).toBe(true);
-    expect(supportsReasoning("openai/gpt-5.4")).toBe(true);
-    expect(supportsReasoning("openai/gpt-5.6-terra")).toBe(true);
+    expect(supportsReasoning("openai/gpt-6.2-sol")).toBe(true);
+    expect(supportsReasoning("openai/gpt-6.2-astra")).toBe(true);
     expect(supportsReasoning("xai/grok-build-0.1")).toBe(false);
     expect(supportsReasoning("deepseek/deepseek-v4-flash")).toBe(false);
     expect(supportsReasoning("invalid")).toBe(false);
@@ -458,9 +470,8 @@ describe("model utilities", () => {
     expect(getDefaultReasoningEffort("anthropic/claude-fable-5-1")).toBe("high");
     expect(getDefaultReasoningEffort("openai/gpt-5.3-codex")).toBeUndefined();
     expect(getDefaultReasoningEffort("openai/gpt-5.5")).toBeUndefined();
-    expect(getDefaultReasoningEffort("openai/gpt-5.6-sol")).toBe("medium");
-    expect(getDefaultReasoningEffort("openai/gpt-5.6-terra")).toBe("medium");
-    expect(getDefaultReasoningEffort("openai/gpt-5.6-luna")).toBe("medium");
+    expect(getDefaultReasoningEffort("openai/gpt-6.2-astra")).toBe("medium");
+    expect(getDefaultReasoningEffort("openai/gpt-6.2-sol")).toBe("medium");
     expect(getDefaultReasoningEffort("xai/grok-build-0.1")).toBeUndefined();
     expect(getDefaultReasoningEffort("deepseek/deepseek-v4-pro")).toBeUndefined();
   });
@@ -498,10 +509,7 @@ describe("model utilities", () => {
       efforts: ["low", "medium", "high", "xhigh", "max"],
       default: "high",
     });
-    expect(getReasoningConfig("openai/gpt-5.4")).toEqual({
-      efforts: ["none", "low", "medium", "high", "xhigh"],
-      default: undefined,
-    });
+    expect(getReasoningConfig("openai/gpt-5.4")).toBeUndefined();
     expect(getReasoningConfig("openai/gpt-6-astra")).toEqual({
       efforts: ["low", "medium", "high", "xhigh", "max"],
       default: "medium",
@@ -522,18 +530,12 @@ describe("model utilities", () => {
       efforts: ["none", "low", "medium", "high", "xhigh", "max"],
       default: "medium",
     });
-    expect(getReasoningConfig("openai/gpt-5.6-sol")).toEqual({
-      efforts: ["none", "low", "medium", "high", "xhigh"],
-      default: "medium",
-    });
-    expect(getReasoningConfig("openai/gpt-5.6-terra")).toEqual({
-      efforts: ["none", "low", "medium", "high", "xhigh"],
-      default: "medium",
-    });
-    expect(getReasoningConfig("openai/gpt-5.6-luna")).toEqual({
-      efforts: ["none", "low", "medium", "high", "xhigh", "max"],
-      default: "medium",
-    });
+    for (const model of ["openai/gpt-6.2-astra", "openai/gpt-6.2-sol"]) {
+      expect(getReasoningConfig(model)).toEqual({
+        efforts: ["low", "medium", "high", "xhigh", "max"],
+        default: "medium",
+      });
+    }
     expect(getReasoningConfig("openai/gpt-5.3-codex")).toBeUndefined();
     expect(getReasoningConfig("xai/grok-4.5")).toEqual({
       efforts: ["low", "medium", "high"],
@@ -566,7 +568,8 @@ describe("model utilities", () => {
     expect(isValidReasoningEffort("anthropic/claude-fable-5", "max")).toBe(true);
     expect(isValidReasoningEffort("anthropic/claude-fable-5-1", "max")).toBe(true);
     expect(isValidReasoningEffort("anthropic/claude-fable-5-1", "none")).toBe(false);
-    expect(isValidReasoningEffort("openai/gpt-5.4", "none")).toBe(true);
+    expect(isValidReasoningEffort("openai/gpt-6.2-sol", "none")).toBe(false);
+    expect(isValidReasoningEffort("openai/gpt-6.2-astra", "none")).toBe(false);
     expect(isValidReasoningEffort("openai/gpt-6-astra", "max")).toBe(true);
     expect(isValidReasoningEffort("openai/gpt-6-astra", "ultra")).toBe(false);
     expect(isValidReasoningEffort("openai/gpt-6-astra", "none")).toBe(false);
@@ -578,9 +581,9 @@ describe("model utilities", () => {
     expect(isValidReasoningEffort("openai/gpt-6.1-terra", "max")).toBe(true);
     expect(isValidReasoningEffort("openai/gpt-6-luna", "none")).toBe(true);
     expect(isValidReasoningEffort("openai/gpt-6-luna", "max")).toBe(true);
-    expect(isValidReasoningEffort("openai/gpt-5.6-sol", "xhigh")).toBe(true);
-    expect(isValidReasoningEffort("openai/gpt-5.6-sol", "max")).toBe(false);
-    expect(isValidReasoningEffort("openai/gpt-5.6-luna", "max")).toBe(true);
+    expect(isValidReasoningEffort("openai/gpt-6.2-sol", "max")).toBe(true);
+    expect(isValidReasoningEffort("openai/gpt-6.2-astra", "max")).toBe(true);
+    expect(isValidReasoningEffort("openai/gpt-5.6-sol", "xhigh")).toBe(false);
     expect(isValidReasoningEffort("openai/gpt-5.3-codex", "high")).toBe(false);
     expect(isValidReasoningEffort("xai/grok-4.6", "high")).toBe(true);
     expect(isValidReasoningEffort("xai/grok-4.6", "xhigh")).toBe(true);
