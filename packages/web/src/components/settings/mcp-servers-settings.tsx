@@ -84,6 +84,7 @@ type FormState = {
   managedRouting: boolean;
   issuer: string;
   resource: string;
+  loopbackRedirect: boolean;
   type: "local" | "remote";
   command: string;
   url: string;
@@ -99,6 +100,7 @@ const emptyForm: FormState = {
   managedRouting: false,
   issuer: "",
   resource: "",
+  loopbackRedirect: false,
   type: "local",
   command: "",
   url: "",
@@ -152,6 +154,7 @@ function metadataToForm(metadata: McpServerMetadata): FormState {
     managedRouting: metadata.managedRouting ?? false,
     issuer: metadata.oauth?.issuer ?? "",
     resource: metadata.oauth?.resource ?? "",
+    loopbackRedirect: metadata.oauth?.redirect === "loopback",
     type: metadata.type,
     command:
       metadata.command
@@ -492,6 +495,19 @@ function McpServerForm({
                 onChange={(e) => setForm({ ...form, resource: e.target.value })}
                 placeholder={form.url || "https://gateway.example.com/mcp"}
               />
+              <Label className="flex items-center gap-2">
+                <Checkbox
+                  checked={form.loopbackRedirect}
+                  onCheckedChange={(checked) =>
+                    setForm({ ...form, loopbackRedirect: checked === true })
+                  }
+                />
+                Use localhost redirect (paste-back)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                For providers that only accept localhost redirects, such as Atlassian Rovo. Users
+                finish connecting by pasting the localhost address their browser lands on.
+              </p>
               <p className="text-xs text-muted-foreground">
                 Users connect their accounts in Personal → Connections. Supported servers use
                 public-client OAuth with PKCE and Streamable HTTP.
@@ -683,6 +699,7 @@ export function McpServersSettings() {
                   ? {
                       issuer: form.issuer.trim(),
                       resource: form.resource.trim() || form.url.trim(),
+                      ...(form.loopbackRedirect ? { redirect: "loopback" as const } : {}),
                     }
                   : null,
               ...(includeCredentials ? { headers: envRecord } : {}),
