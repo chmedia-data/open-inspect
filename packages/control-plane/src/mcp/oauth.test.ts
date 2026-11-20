@@ -78,11 +78,55 @@ describe("McpOAuthService protected resource discovery", () => {
     expect(requested.slice(0, 2)).toEqual([`${ROOT_PATH}/v4/mcp`, ROOT_PATH]);
   });
 
-  it("fails when neither location publishes metadata", async () => {
-    const { service } = setup({});
+  it("falls back to the same-origin issuer when both locations answer 404", async () => {
+    const { service, requested, registered } = setup({});
+    await expect(service.client(server, REDIRECT)).resolves.toMatchObject({
+      issuer: ORIGIN,
+      token_endpoint: `${ORIGIN}/token`,
+    });
+    expect(requested).toEqual([
+      `${ROOT_PATH}/v4/mcp`,
+      ROOT_PATH,
+      "/.well-known/oauth-authorization-server",
+      "/register",
+    ]);
+    expect(registered).toEqual([[REDIRECT]]);
+  });
+
+  it.each([
+    ["the path-inserted probe", { [`${ROOT_PATH}/v4/mcp`]: 500 }],
+    ["the origin-root probe", { [ROOT_PATH]: 503 }],
+    ["both probes", { [`${ROOT_PATH}/v4/mcp`]: 401, [ROOT_PATH]: 403 }],
+  ])("does not fall back after a non-404 failure on %s", async (_label, paths) => {
+    const { service, requested } = setup(paths);
     await expect(service.client(server, REDIRECT)).rejects.toMatchObject({
       code: "mcp_reconnect_required",
     });
+    expect(requested).not.toContain("/.well-known/oauth-authorization-server");
+  });
+
+  it("refuses the fallback for an issuer on another origin", async () => {
+    const { service, requested } = setup({});
+    const crossOrigin = {
+      ...server,
+      oauth: { issuer: "https://auth.example.com", resource: RESOURCE },
+    } as unknown as McpServerMetadata;
+    await expect(service.client(crossOrigin, REDIRECT)).rejects.toMatchObject({
+      code: "mcp_denied",
+    });
+    expect(requested).toEqual([`${ROOT_PATH}/v4/mcp`, ROOT_PATH]);
+  });
+
+  it("refuses the fallback when the metadata names a different issuer", async () => {
+    const { service, registered } = setup({});
+    const mismatched = {
+      ...server,
+      oauth: { issuer: `${ORIGIN}/`, resource: RESOURCE },
+    } as unknown as McpServerMetadata;
+    await expect(service.client(mismatched, REDIRECT)).rejects.toMatchObject({
+      code: "mcp_denied",
+    });
+    expect(registered).toEqual([]);
   });
 
   it("still rejects root metadata naming a different resource", async () => {

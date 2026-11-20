@@ -61,39 +61,44 @@ async function boundedJson(response: Response): Promise<unknown> {
   }
   return JSON.parse(new TextDecoder().decode(bytes));
 }
+function oauthFetch(fetcher: McpFetch, url: string, init: RequestInit = {}): Promise<Response> {
+  mcpDestination(url);
+  return fetcher(
+    new Request(url, {
+      ...init,
+      redirect: "manual",
+      signal: AbortSignal.timeout(MCP_CREDENTIAL_TIMEOUT_MS),
+    })
+  );
+}
 async function oauthRequest(
   fetcher: McpFetch,
   url: string,
   init: RequestInit = {}
 ): Promise<unknown> {
-  mcpDestination(url);
-  return boundedJson(
-    await fetcher(
-      new Request(url, {
-        ...init,
-        redirect: "manual",
-        signal: AbortSignal.timeout(MCP_CREDENTIAL_TIMEOUT_MS),
-      })
-    )
-  );
+  return boundedJson(await oauthFetch(fetcher, url, init));
 }
 /**
  * RFC 9728 discovery by probing: the path-inserted well-known URL first, then the origin-root URL
  * for servers that only publish metadata there. A probe that returns a non-success response falls
- * through to the next candidate; timeouts, oversized bodies and other failures do not.
+ * through to the next candidate; timeouts, oversized bodies and other failures do not. Returns null
+ * only when every candidate answers 404, i.e. the server publishes no protected-resource metadata.
  */
-async function protectedResourceMetadata(fetcher: McpFetch, resource: URL): Promise<unknown> {
+async function protectedResourceMetadata(
+  fetcher: McpFetch,
+  resource: URL
+): Promise<unknown | null> {
   const base = `${resource.origin}/.well-known/oauth-protected-resource`;
   const candidates = resource.pathname === "/" ? [base] : [`${base}${resource.pathname}`, base];
-  for (const [index, url] of candidates.entries()) {
-    try {
-      return await oauthRequest(fetcher, url);
-    } catch (error) {
-      const retryable = error instanceof McpError && error.code === "mcp_reconnect_required";
-      if (!retryable || index === candidates.length - 1) throw error;
-    }
+  let allMissing = true;
+  for (const url of candidates) {
+    const response = await oauthFetch(fetcher, url);
+    if (response.ok) return boundedJson(response);
+    await response.body?.cancel();
+    if (response.status !== 404) allMissing = false;
   }
-  throw new McpError("mcp_unavailable", 503);
+  if (allMissing) return null;
+  throw new McpError("mcp_reconnect_required");
 }
 async function exchange(
   fetcher: McpFetch,
@@ -159,14 +164,22 @@ export class McpOAuthService {
       return current;
     }
     const protectedMetadata = await protectedResourceMetadata(this.fetcher, resource);
-    const protectedProfile = z
-      .object({ resource: z.string(), authorization_servers: z.array(z.string()) })
-      .parse(protectedMetadata);
-    if (
-      protectedProfile.resource !== server.oauth.resource ||
-      !protectedProfile.authorization_servers.includes(server.oauth.issuer)
-    )
-      throw new McpError("mcp_denied");
+    if (protectedMetadata === null) {
+      // No RFC 9728 metadata anywhere (e.g. Atlassian Rovo): trust the admin-configured issuer only
+      // when it shares the server's origin, as earlier MCP clients discover authorization; the
+      // authorization-server metadata below must still name that exact issuer.
+      if (issuer.origin !== target.origin || resource.origin !== target.origin)
+        throw new McpError("mcp_denied");
+    } else {
+      const protectedProfile = z
+        .object({ resource: z.string(), authorization_servers: z.array(z.string()) })
+        .parse(protectedMetadata);
+      if (
+        protectedProfile.resource !== server.oauth.resource ||
+        !protectedProfile.authorization_servers.includes(server.oauth.issuer)
+      )
+        throw new McpError("mcp_denied");
+    }
     const metadata = metadataSchema.parse(
       await oauthRequest(
         this.fetcher,
