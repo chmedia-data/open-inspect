@@ -86,6 +86,7 @@ type FormState = {
   resource: string;
   clientId: string;
   scopes: string;
+  loopbackRedirect: boolean;
   type: "local" | "remote";
   command: string;
   url: string;
@@ -103,6 +104,7 @@ const emptyForm: FormState = {
   resource: "",
   clientId: "",
   scopes: "",
+  loopbackRedirect: false,
   type: "local",
   command: "",
   url: "",
@@ -158,6 +160,7 @@ function metadataToForm(metadata: McpServerMetadata): FormState {
     resource: metadata.oauth?.resource ?? "",
     clientId: metadata.oauth?.clientId ?? "",
     scopes: metadata.oauth?.scopes?.join(" ") ?? "",
+    loopbackRedirect: metadata.oauth?.redirect === "loopback",
     type: metadata.type,
     command:
       metadata.command
@@ -510,6 +513,19 @@ function McpServerForm({
                 onChange={(e) => setForm({ ...form, scopes: e.target.value })}
                 placeholder="Space-separated; leave blank for the server's default"
               />
+              <Label className="flex items-center gap-2">
+                <Checkbox
+                  checked={form.loopbackRedirect}
+                  onCheckedChange={(checked) =>
+                    setForm({ ...form, loopbackRedirect: checked === true })
+                  }
+                />
+                Use localhost redirect (paste-back)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                For providers that only accept localhost redirect URIs. Users finish connecting by
+                pasting the localhost address their browser lands on.
+              </p>
               <p className="text-xs text-muted-foreground">
                 Users connect their accounts in Personal → Connections. Supported servers use
                 public-client OAuth with PKCE and Streamable HTTP. Enter a client ID only for a
@@ -706,6 +722,7 @@ export function McpServersSettings() {
                       resource: form.resource.trim() || form.url.trim(),
                       ...(form.clientId.trim() ? { clientId: form.clientId.trim() } : {}),
                       ...(form.scopes.trim() ? { scopes: form.scopes.trim().split(/\s+/) } : {}),
+                      ...(form.loopbackRedirect ? { redirect: "loopback" as const } : {}),
                     }
                   : null,
               ...(includeCredentials ? { headers: envRecord } : {}),

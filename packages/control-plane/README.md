@@ -86,6 +86,21 @@ records the acting user, route, request ID, and HTTP outcome; the correlated
 the same signed web-service plus browser-session authentication as other human settings operations;
 a bare service credential cannot invoke it.
 
+The OAuth redirect URI is the web app's HTTPS callback, unless the definition's OAuth profile sets
+`"redirect": "loopback"`. Such definitions register and authorize with the fixed
+`MCP_OAUTH_LOOPBACK_REDIRECT_URI` (`http://localhost:33418/callback`) for providers that accept only
+loopback redirects. Nothing listens there: the user pastes the redirect into settings, and the web
+app checks it against that URI and forwards its `code`, `state` and `iss` to
+`/mcp-connections/oauth/callback`. PKCE, hashed state and browser-session binding are the same in
+both modes. Any other plain-HTTP redirect is refused. Toggling the mode does not bump
+`auth_revision`: existing grants keep refreshing with their own client, and the next consent
+registers a new client because cached clients are matched on redirect URI.
+
+Issuer discovery follows RFC 9728 protected-resource metadata. When every probe answers 404 (as on
+Atlassian Rovo), the configured issuer is trusted only if it and the resource share the server URL's
+origin; the issuer's authorization-server metadata must still name it exactly, and the S256,
+endpoint-pinning and registration checks are unchanged. Any non-404 probe failure still fails.
+
 Consent is ephemeral: each connection retains at most its current pending/claimed attempt after
 publication. Settlement, failure, supersession, and disconnect delete verifier material.
 Reconnecting keeps a working grant usable until the new consent settles, which replaces it with a

@@ -632,4 +632,31 @@ describe("McpServersSettings", () => {
       })
     );
   });
+
+  it("opts a personal OAuth server into the localhost paste-back redirect", async () => {
+    mocks.updateMcpServer.mockResolvedValue({ ...servers[0], revision: 4 });
+    const user = userEvent.setup();
+    render(<McpServersSettings />);
+    await user.click(screen.getByRole("button", { name: /Server A/ }));
+    await user.click(screen.getByRole("combobox", { name: "Authentication" }));
+    await user.click(screen.getByRole("option", { name: /Each user/ }));
+    await user.type(
+      screen.getByPlaceholderText("https://gateway.example.com/mcp"),
+      "https://issuer.example.com"
+    );
+    const loopback = screen.getByRole("checkbox", { name: "Use localhost redirect (paste-back)" });
+    expect(loopback).not.toBeChecked();
+    await user.click(loopback);
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    expect(mocks.updateMcpServer).toHaveBeenCalledWith(
+      "server-a",
+      expect.objectContaining({
+        oauth: {
+          issuer: "https://issuer.example.com",
+          resource: "https://a.example.com",
+          redirect: "loopback",
+        },
+      })
+    );
+  });
 });

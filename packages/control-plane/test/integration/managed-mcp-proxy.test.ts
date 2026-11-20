@@ -18,6 +18,7 @@ import { McpConnectionStore, connectionBinding } from "../../src/db/mcp-connecti
 import { McpOAuthService } from "../../src/mcp/oauth";
 import { SessionInternalPaths } from "../../src/session/contracts";
 import { PersonalAccessTokenStore } from "../../src/db/personal-access-tokens";
+import { MCP_OAUTH_LOOPBACK_REDIRECT_URI } from "@open-inspect/shared/types/integrations";
 const alice = "11111111111111111111111111111111";
 const bob = "22222222222222222222222222222222";
 const token = "test-current-sandbox";
@@ -792,6 +793,45 @@ describe("managed MCP actual sandbox route + session authority", () => {
       as: { userId: bob, role: "member" },
     });
     expect((await f.store.get(alice, f.server.id))?.status).toBe("connected");
+  });
+
+  it("loopback servers authorize and redeem through the fixed loopback redirect", async () => {
+    await serviceFetch("https://test.local/mcp-connections");
+    const registry = new McpServerStore(env.DB, env.REPO_SECRETS_ENCRYPTION_KEY!);
+    const server = await registry.create({
+      name: "loopback",
+      type: "remote",
+      url: `${origin}/mcp`,
+      enabled: true,
+      managedRouting: true,
+      authMode: "user_oauth",
+      oauth: { issuer: origin, resource: `${origin}/mcp`, redirect: "loopback" },
+    });
+    const listed = await serviceFetch("https://test.local/mcp-connections");
+    expect(await listed.json()).toMatchObject({
+      connections: [{ serverId: server.id, redirect: "loopback", status: "not_connected" }],
+    });
+    const start = await serviceFetch(`https://test.local/mcp-connections/${server.id}/connect`, {
+      method: "POST",
+    });
+    const { authorizationUrl } = await start.json<{ authorizationUrl: string }>();
+    expect(new URL(authorizationUrl).searchParams.get("redirect_uri")).toBe(
+      MCP_OAUTH_LOOPBACK_REDIRECT_URI
+    );
+    const consent = await fetch(authorizationUrl, { redirect: "manual" });
+    const landed = new URL(consent.headers.get("location")!);
+    expect(`${landed.origin}${landed.pathname}`).toBe(MCP_OAUTH_LOOPBACK_REDIRECT_URI);
+    const redeemed = await serviceFetch("https://test.local/mcp-connections/oauth/callback", {
+      method: "POST",
+      body: JSON.stringify({
+        code: landed.searchParams.get("code"),
+        state: landed.searchParams.get("state"),
+        iss: landed.searchParams.get("iss"),
+      }),
+    });
+    expect(redeemed.status).toBe(200);
+    const store = new McpConnectionStore(env.DB, env.TOKEN_ENCRYPTION_KEY!);
+    expect((await store.get(alice, server.id))?.status).toBe("connected");
   });
 
   it("self-disconnect clears an abandoned OAuth flow and releases definition deletion", async () => {

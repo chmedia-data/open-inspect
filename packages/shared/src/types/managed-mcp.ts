@@ -7,6 +7,16 @@ export type McpAuthMode = z.infer<typeof mcpAuthModeSchema>;
 export const DEFAULT_MCP_AUTH_MODE = "service_credentials" as const;
 export const MANAGED_MCP_VERSION = 1 as const;
 
+/**
+ * Fixed redirect for `redirect: "loopback"` servers. Providers that only accept loopback redirects
+ * (such as Atlassian Rovo) send the browser here; nothing listens, and the user pastes the URL back.
+ */
+export const MCP_OAUTH_LOOPBACK_REDIRECT_URI = "http://localhost:33418/callback";
+
+/** Where the provider returns the browser: the web app callback (default) or the loopback paste-back. */
+export const mcpOAuthRedirectSchema = z.enum(["web", "loopback"]);
+export type McpOAuthRedirect = z.infer<typeof mcpOAuthRedirectSchema>;
+
 /** RFC 6749 §3.3 scope-token: printable ASCII without space, double quote or backslash. */
 export const MCP_OAUTH_SCOPE_TOKEN = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
 
@@ -22,6 +32,7 @@ export const mcpOAuthProfileSchema = z.strictObject({
   resource: z.url(),
   clientId: z.string().trim().min(1).max(512).optional(),
   scopes: z.array(z.string().regex(MCP_OAUTH_SCOPE_TOKEN)).min(1).max(32).optional(),
+  redirect: mcpOAuthRedirectSchema.optional(),
 });
 export type McpOAuthProfile = z.infer<typeof mcpOAuthProfileSchema>;
 
@@ -45,6 +56,8 @@ export interface McpPersonalConnection {
   serverId: string;
   name: string;
   authMode: McpAuthMode;
+  /** "loopback" connections finish by pasting the provider's redirect URL back into settings. */
+  redirect: McpOAuthRedirect;
   status: McpConnectionStatus | "not_connected";
 }
 
