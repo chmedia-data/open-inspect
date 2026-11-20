@@ -84,7 +84,7 @@ vi.mock("@/components/automations/automation-form", () => ({
             props.onSubmit({
               name: "Updated",
               harness: "opencode",
-              model: "openai/gpt-5.4",
+              model: "openai/gpt-6.1-terra",
               reasoningEffort: null,
               triggerType: "schedule",
               instructions: "Review",

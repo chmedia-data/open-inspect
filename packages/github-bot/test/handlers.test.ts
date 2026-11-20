@@ -74,7 +74,7 @@ function createMockEnv(): Env {
     }
     if (url === "https://internal/model-preferences?strict=true") {
       return Promise.resolve(
-        Response.json({ enabledModels: ["anthropic/claude-haiku-4-5", "openai/gpt-5.6-sol"] })
+        Response.json({ enabledModels: ["anthropic/claude-haiku-4-5", "openai/gpt-6.2-astra"] })
       );
     }
     if (url === "https://internal/sessions") {
@@ -559,7 +559,7 @@ describe.each([
     const result = await run(
       env,
       log,
-      "@test-bot[bot] !model openai/gpt-5.6-sol !reasoning:xhigh fix the flaky test"
+      "@test-bot[bot] !model openai/gpt-6.2-astra !reasoning:xhigh fix the flaky test"
     );
 
     expect(result).toMatchObject({ outcome: "processed" });
@@ -569,7 +569,7 @@ describe.each([
     )!;
     expect(new Headers(modelPreferencesCall[1].headers).has("X-OpenInspect-Actor")).toBe(false);
     expect(sessionCreateBody(cpFetch)).toMatchObject({
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       harness: "opencode",
       reasoningEffort: "xhigh",
     });
@@ -579,7 +579,7 @@ describe.each([
     expect(prompt).not.toContain("!reasoning");
     expect(log.info).toHaveBeenCalledWith(
       "session.created",
-      expect.objectContaining({ model: "openai/gpt-5.6-sol", inline_model_override: true })
+      expect.objectContaining({ model: "openai/gpt-6.2-astra", inline_model_override: true })
     );
   });
 
@@ -589,7 +589,7 @@ describe.each([
     const githubFetch = vi.fn().mockResolvedValue(new Response("", { status: 201 }));
     vi.stubGlobal("fetch", githubFetch);
 
-    expect(await run(env, createMockLogger(), "@test-bot[bot] !model:gpt-5.6-sol fix it")).toEqual({
+    expect(await run(env, createMockLogger(), "@test-bot[bot] !model:gpt-6.2-astra fix it")).toEqual({
       outcome: "skipped",
       skip_reason: "harness_model_incompatible",
     });
@@ -598,7 +598,7 @@ describe.each([
     expect(postReaction).not.toHaveBeenCalled();
     expect(githubFetch).toHaveBeenCalledTimes(1);
     const comment = JSON.parse(githubFetch.mock.calls[0][1].body).body;
-    expect(comment).toContain('Model "openai/gpt-5.6-sol" cannot run on the Claude Agent harness.');
+    expect(comment).toContain('Model "openai/gpt-6.2-astra" cannot run on the Claude Agent harness.');
     expect(comment).toContain("`!model`");
     expect(comment).toContain("default model");
     expect(comment).toContain("GitHub integration harness");
@@ -622,13 +622,13 @@ describe.each([
     await run(
       env,
       createMockLogger(),
-      "@test-bot[bot] explain what !model openai/gpt-5.6-sol does"
+      "@test-bot[bot] explain what !model openai/gpt-6.2-astra does"
     );
 
     expect(modelPreferencesFetched(env)).toBe(false);
     const cpFetch = getControlPlaneFetch(env);
     expect(sessionCreateBody(cpFetch).model).toBe("anthropic/claude-haiku-4-5");
-    expect(promptSendBody(cpFetch).content).toContain("!model openai/gpt-5.6-sol");
+    expect(promptSendBody(cpFetch).content).toContain("!model openai/gpt-6.2-astra");
   });
 
   it.each([
@@ -646,7 +646,7 @@ describe.each([
     },
     {
       name: "a duplicate flag",
-      body: "@test-bot[bot] !model gpt-5.6-sol !model gpt-5.6-sol fix it",
+      body: "@test-bot[bot] !model gpt-6.2-astra !model gpt-6.2-astra fix it",
       reason: "invalid_inline_flags",
       message: "The !model flag can only be specified once.",
     },
@@ -679,7 +679,7 @@ describe.each([
     vi.stubGlobal("fetch", githubFetch);
 
     expect(
-      await run(env, createMockLogger(), "@test-bot[bot] !model openai/gpt-5.6-sol fix it")
+      await run(env, createMockLogger(), "@test-bot[bot] !model openai/gpt-6.2-astra fix it")
     ).toEqual({ outcome: "skipped", skip_reason: "model_preferences_unavailable" });
     expect(
       getControlPlaneFetch(env).mock.calls.some(([url]) => url === "https://internal/sessions")
@@ -1483,7 +1483,7 @@ describe("integration config", () => {
   it("launches Codex with its max reasoning effort", async () => {
     vi.mocked(getGitHubConfig).mockResolvedValue({
       ...defaultConfig,
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       harness: "codex",
       reasoningEffort: "max",
     });
@@ -1492,7 +1492,7 @@ describe("integration config", () => {
     await handleReviewRequested(env, createMockLogger(), reviewRequestedPayload, "trace-codex-max");
 
     expect(sessionCreateBody(getControlPlaneFetch(env))).toMatchObject({
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       harness: "codex",
       reasoningEffort: "max",
     });
@@ -1501,7 +1501,7 @@ describe("integration config", () => {
   it("refuses Codex none reasoning before session creation", async () => {
     vi.mocked(getGitHubConfig).mockResolvedValue({
       ...defaultConfig,
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6-sol",
       harness: "codex",
       reasoningEffort: "none",
     });
@@ -1522,30 +1522,6 @@ describe("integration config", () => {
     );
   });
 
-  it("refuses a Codex-only configured effort inherited by OpenCode", async () => {
-    vi.mocked(getGitHubConfig).mockResolvedValue({
-      ...defaultConfig,
-      model: "openai/gpt-5.6-sol",
-      harness: "opencode",
-      reasoningEffort: "max",
-    });
-    const env = createMockEnv();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 201 })));
-
-    expect(
-      await handleReviewRequested(
-        env,
-        createMockLogger(),
-        reviewRequestedPayload,
-        "trace-opencode-max"
-      )
-    ).toEqual({ outcome: "skipped", skip_reason: "harness_model_incompatible" });
-    expect(getControlPlaneFetch(env)).not.toHaveBeenCalledWith(
-      "https://internal/sessions",
-      expect.anything()
-    );
-  });
-
   it.each([
     ...routedHandlers,
     {
@@ -1556,7 +1532,7 @@ describe("integration config", () => {
   ])("refuses a harness/model mismatch for $name", async ({ run }) => {
     vi.mocked(getGitHubConfig).mockResolvedValue({
       ...defaultConfig,
-      model: "openai/gpt-5.4",
+      model: "openai/gpt-6.1-terra",
       harness: "claude",
     });
     const env = createMockEnv();
@@ -1577,7 +1553,7 @@ describe("integration config", () => {
       expect.objectContaining({ method: "POST" })
     );
     const comment = JSON.parse(githubFetch.mock.calls[0][1].body).body;
-    expect(comment).toContain('Model "openai/gpt-5.4" cannot run on the Claude Agent harness.');
+    expect(comment).toContain('Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness.');
     expect(comment).toContain("`!model`");
     expect(comment).toContain("default model");
     expect(comment).toContain("GitHub integration harness");

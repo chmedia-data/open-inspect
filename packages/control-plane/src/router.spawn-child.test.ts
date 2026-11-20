@@ -397,7 +397,7 @@ describe("handleSpawnChild prompt enqueue handling", () => {
     });
     vi.mocked(getEffectiveEnabledModels).mockResolvedValue([
       "anthropic/claude-sonnet-4-6",
-      "openai/gpt-5.5",
+      "openai/gpt-6.2-sol",
     ]);
     const { env, childStub } = makeSuccessfulEnv({
       ...spawnContext,
@@ -410,14 +410,14 @@ describe("handleSpawnChild prompt enqueue handling", () => {
     expect(store.create).toHaveBeenCalledWith(
       expect.objectContaining({
         harness: "codex",
-        model: "openai/gpt-5.5",
-        reasoningEffort: "medium",
+        model: "openai/gpt-6.2-sol",
+        reasoningEffort: "max",
       })
     );
     await expect(getInitBody(childStub)).resolves.toMatchObject({
       harness: "codex",
-      model: "openai/gpt-5.5",
-      reasoningEffort: "medium",
+      model: "openai/gpt-6.2-sol",
+      reasoningEffort: "max",
     });
     expect(getEffectiveEnabledModels).toHaveBeenCalledOnce();
   });
@@ -547,21 +547,21 @@ describe("handleSpawnChild prompt enqueue handling", () => {
     });
     vi.mocked(getEffectiveEnabledModels).mockResolvedValue([
       "anthropic/claude-sonnet-4-6",
-      "openai/gpt-5.6-sol",
+      "openai/gpt-6.2-astra",
     ]);
     const { env, childStub } = makeSuccessfulEnv(spawnContext);
 
     const response = await makeRequest(env, {
       title: "Child task",
       prompt: "Do the thing",
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       reasoningEffort: "x-high",
     });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       error:
-        'Invalid reasoning effort "x-high" for model "openai/gpt-5.6-sol". Valid efforts: none, low, medium, high, xhigh',
+        'Invalid reasoning effort "x-high" for model "openai/gpt-6.2-astra". Valid efforts: low, medium, high, xhigh, max',
     });
     expect(childStub.fetch).not.toHaveBeenCalled();
   });
@@ -573,14 +573,14 @@ describe("handleSpawnChild prompt enqueue handling", () => {
     });
     vi.mocked(getEffectiveEnabledModels).mockResolvedValue([
       "anthropic/claude-sonnet-4-6",
-      "openai/gpt-5.6-sol",
+      "openai/gpt-6.2-astra",
     ]);
     const { env, childStub } = makeSuccessfulEnv(spawnContext);
 
     const response = await makeRequest(env, {
       title: "Child task",
       prompt: "Do the thing",
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       reasoningEffort: "xhigh",
     });
 

@@ -41,7 +41,7 @@ describe("Model preferences API", () => {
     await seedPreferences(stored);
     const response = await serviceFetch("https://test.local/model-preferences", {
       method: "PUT",
-      body: JSON.stringify({ enabledModels: ["openai/gpt-5.4"] }),
+      body: JSON.stringify({ enabledModels: ["openai/gpt-6.1-terra"] }),
     });
     expect(response.status).toBe(405);
     expect(await response.json()).toEqual({
@@ -63,27 +63,27 @@ describe("Model preferences API", () => {
   });
 
   it("returns an authoritative snapshot for strict reads", async () => {
-    await seedPreferences(["openai/gpt-5.4"]);
+    await seedPreferences(["openai/gpt-6.1-terra"]);
 
     const response = await serviceFetch("https://test.local/model-preferences?strict=true");
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      enabledModels: ["openai/gpt-5.4"],
+      enabledModels: ["openai/gpt-6.1-terra"],
       revision: 1,
       defaultModel: DEFAULT_MODEL,
     });
   });
 
   it("filters removed models without changing the stored row", async () => {
-    const stored = ["openai/gpt-5.2", "openai/gpt-5.4", "anthropic/claude-sonnet-4-6"];
+    const stored = ["openai/gpt-5.2", "openai/gpt-6.1-terra", "anthropic/claude-sonnet-4-6"];
     await seedPreferences(stored);
 
     const response = await serviceFetch("https://test.local/model-preferences");
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      enabledModels: ["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"],
+      enabledModels: ["openai/gpt-6.1-terra", "anthropic/claude-sonnet-4-6"],
       revision: 1,
       defaultModel: DEFAULT_MODEL,
     });
@@ -91,12 +91,12 @@ describe("Model preferences API", () => {
   });
 
   it("normalizes and deduplicates stored legacy model IDs", async () => {
-    await seedPreferences(["gpt-5.4", "openai/gpt-5.4", "claude-sonnet-4-6"]);
+    await seedPreferences(["gpt-6.1-terra", "openai/gpt-6.1-terra", "claude-sonnet-4-6"]);
 
     const response = await serviceFetch("https://test.local/model-preferences");
 
     expect(await response.json()).toEqual({
-      enabledModels: ["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"],
+      enabledModels: ["openai/gpt-6.1-terra", "anthropic/claude-sonnet-4-6"],
       revision: 1,
       defaultModel: DEFAULT_MODEL,
     });
@@ -115,7 +115,7 @@ describe("Model preferences API", () => {
   });
 
   it("returns defaults for a malformed stored value", async () => {
-    await seedPreferences({ model: "openai/gpt-5.4" });
+    await seedPreferences({ model: "openai/gpt-6.1-terra" });
 
     const response = await serviceFetch("https://test.local/model-preferences");
 
@@ -128,10 +128,10 @@ describe("Model preferences API", () => {
   });
 
   it("applies atomic model membership changes and increments the revision", async () => {
-    await seedPreferences(["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"]);
+    await seedPreferences(["openai/gpt-6.1-terra", "anthropic/claude-sonnet-4-6"]);
 
     const response = await patchPreferences([
-      { modelId: "openai/gpt-5.4", enabled: false },
+      { modelId: "openai/gpt-6.1-terra", enabled: false },
       { modelId: "anthropic/claude-haiku-4-5", enabled: true },
     ]);
 
@@ -155,17 +155,17 @@ describe("Model preferences API", () => {
   });
 
   it("gives an accepted no-op update a new revision", async () => {
-    await seedPreferences(["openai/gpt-5.4"]);
+    await seedPreferences(["openai/gpt-6.1-terra"]);
 
-    const response = await patchPreferences([{ modelId: "openai/gpt-5.4", enabled: true }]);
+    const response = await patchPreferences([{ modelId: "openai/gpt-6.1-terra", enabled: true }]);
 
     expect(response.status).toBe(200);
-    expect(await getStoredModels()).toEqual(["openai/gpt-5.4"]);
+    expect(await getStoredModels()).toEqual(["openai/gpt-6.1-terra"]);
     expect(await getStoredRevision()).toBe(2);
   });
 
   it("rejects malformed PATCH JSON without replacing preferences", async () => {
-    const stored = ["openai/gpt-5.4"];
+    const stored = ["openai/gpt-6.1-terra"];
     await seedPreferences(stored);
 
     const response = await serviceFetch("https://test.local/model-preferences", {
@@ -179,7 +179,7 @@ describe("Model preferences API", () => {
   });
 
   it("repairs malformed storage from defaults while applying an update", async () => {
-    await seedPreferences({ model: "openai/gpt-5.4" });
+    await seedPreferences({ model: "openai/gpt-6.1-terra" });
 
     const response = await patchPreferences([{ modelId: "opencode/kimi-k2.5", enabled: true }]);
 
@@ -188,20 +188,20 @@ describe("Model preferences API", () => {
   });
 
   it("rejects invalid, legacy, duplicate, and empty change lists atomically", async () => {
-    const stored = ["openai/gpt-5.4"];
+    const stored = ["openai/gpt-6.1-terra"];
     await seedPreferences(stored);
 
     for (const body of [
       { changes: [] },
-      { changes: [{ modelId: "gpt-5.4", enabled: true }] },
+      { changes: [{ modelId: "gpt-6.1-terra", enabled: true }] },
       { changes: [{ modelId: "unknown/model", enabled: true }] },
       {
         changes: [
-          { modelId: "openai/gpt-5.4", enabled: true },
-          { modelId: "openai/gpt-5.4", enabled: false },
+          { modelId: "openai/gpt-6.1-terra", enabled: true },
+          { modelId: "openai/gpt-6.1-terra", enabled: false },
         ],
       },
-      { changes: [{ modelId: "openai/gpt-5.4", enabled: "yes" }] },
+      { changes: [{ modelId: "openai/gpt-6.1-terra", enabled: "yes" }] },
     ]) {
       const response = await serviceFetch("https://test.local/model-preferences", {
         method: "PATCH",
@@ -214,17 +214,17 @@ describe("Model preferences API", () => {
   });
 
   it("rejects an update that would disable every model", async () => {
-    await seedPreferences(["openai/gpt-5.4"]);
+    await seedPreferences(["openai/gpt-6.1-terra"]);
 
-    const response = await patchPreferences([{ modelId: "openai/gpt-5.4", enabled: false }]);
+    const response = await patchPreferences([{ modelId: "openai/gpt-6.1-terra", enabled: false }]);
 
     expect(response.status).toBe(400);
-    expect(await getStoredModels()).toEqual(["openai/gpt-5.4"]);
+    expect(await getStoredModels()).toEqual(["openai/gpt-6.1-terra"]);
     expect(await getStoredRevision()).toBe(1);
   });
 
   it("merges concurrent independent changes instead of losing one", async () => {
-    await seedPreferences(["openai/gpt-5.4"]);
+    await seedPreferences(["openai/gpt-6.1-terra"]);
 
     const responses = await Promise.all([
       patchPreferences([{ modelId: "anthropic/claude-haiku-4-5", enabled: true }]),
@@ -233,7 +233,7 @@ describe("Model preferences API", () => {
 
     expect(responses.map((response) => response.status)).toEqual([200, 200]);
     expect(new Set((await getStoredModels()) as string[])).toEqual(
-      new Set(["openai/gpt-5.4", "anthropic/claude-haiku-4-5", "anthropic/claude-sonnet-4-6"])
+      new Set(["openai/gpt-6.1-terra", "anthropic/claude-haiku-4-5", "anthropic/claude-sonnet-4-6"])
     );
     expect(await getStoredRevision()).toBe(3);
   });

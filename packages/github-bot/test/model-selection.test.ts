@@ -10,7 +10,7 @@ const harness = "opencode";
 const enabledModels = [
   "anthropic/claude-sonnet-4-6",
   "anthropic/claude-haiku-4-5",
-  "openai/gpt-5.6-sol",
+  "openai/gpt-6.2-astra",
   "opencode/kimi-k3",
 ] satisfies ValidModel[];
 
@@ -18,23 +18,23 @@ describe("applyInlineModelOverrides", () => {
   it("applies a model and reasoning override together", () => {
     expect(
       applyInlineModelOverrides(
-        { model: "openai/gpt-5.6-sol", reasoningEffort: "xhigh" },
+        { model: "openai/gpt-6.2-astra", reasoningEffort: "xhigh" },
         defaults,
         enabledModels,
         harness
       )
     ).toEqual({
       ok: true,
-      selection: { model: "openai/gpt-5.6-sol", reasoningEffort: "xhigh" },
+      selection: { model: "openai/gpt-6.2-astra", reasoningEffort: "xhigh" },
     });
   });
 
   it("normalizes bare model ids and keeps a compatible configured effort", () => {
     expect(
-      applyInlineModelOverrides({ model: "gpt-5.6-sol" }, defaults, enabledModels, harness)
+      applyInlineModelOverrides({ model: "gpt-6.2-astra" }, defaults, enabledModels, harness)
     ).toEqual({
       ok: true,
-      selection: { model: "openai/gpt-5.6-sol", reasoningEffort: "low" },
+      selection: { model: "openai/gpt-6.2-astra", reasoningEffort: "low" },
     });
   });
 
@@ -70,7 +70,7 @@ describe("applyInlineModelOverrides", () => {
       applyInlineModelOverrides(
         { model: "anthropic/claude-sonnet-4-6" },
         defaults,
-        ["openai/gpt-5.6-sol"],
+        ["openai/gpt-6.2-astra"],
         harness
       )
     ).toEqual({
@@ -128,14 +128,14 @@ describe("resolveModelSelection compatibility", () => {
           env,
           log,
           "trace-compatibility",
-          { model: "gpt-5.6-sol", harness: "claude", reasoningEffort: null },
+          { model: "gpt-6.2-astra", harness: "claude", reasoningEffort: null },
           parseInlinePromptFlags(prompt)
         )
       ).toMatchObject({
         ok: false,
         reason: "harness_model_incompatible",
         message: expect.stringContaining(
-          'Model "openai/gpt-5.6-sol" cannot run on the Claude Agent harness.'
+          'Model "openai/gpt-6.2-astra" cannot run on the Claude Agent harness.'
         ),
       });
       expect(fetch).not.toHaveBeenCalled();
@@ -153,7 +153,7 @@ describe("resolveModelSelection compatibility", () => {
         env,
         log,
         "trace-compatible-override",
-        { model: "openai/gpt-5.6-sol", harness: "claude", reasoningEffort: "low" },
+        { model: "openai/gpt-6.2-astra", harness: "claude", reasoningEffort: "low" },
         parseInlinePromptFlags("!model:claude-sonnet-4-6 Review this")
       )
     ).toEqual({
@@ -170,7 +170,7 @@ describe("resolveModelSelection compatibility", () => {
   it("uses Codex reasoning capabilities for inline overrides", async () => {
     const env = { CONTROL_PLANE: { fetch: vi.fn() } } as unknown as Env;
     const codexDefaults = {
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       harness: "codex" as const,
       reasoningEffort: "low",
     };

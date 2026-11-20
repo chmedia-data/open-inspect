@@ -495,7 +495,7 @@ describe("POST /callbacks/thread_closed", () => {
         sessionId: "session-1",
         repoId: "acme/app",
         repoFullName: "acme/app",
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-6.1-terra",
         createdAt: 1,
         teamId: "team-a",
       });

@@ -195,7 +195,7 @@ describe("automation create route", () => {
     it("saves native max and effective OpenAI pins without rollout configuration", async () => {
       const preferences = vi
         .spyOn(ModelPreferencesStore.prototype, "getEnabledModels")
-        .mockResolvedValue(["openai/gpt-5.6-sol"]);
+        .mockResolvedValue(["openai/gpt-6.2-astra"]);
       const handle = createTestRequestHandler([automationRoutes]);
       const request = automationRequest((request, env, tasks) => handle(request, env, tasks));
       mockProviderAccountStore.getById.mockResolvedValue(null);
@@ -204,7 +204,7 @@ describe("automation create route", () => {
           body: {
             ...validBody,
             harness: "codex",
-            model: "openai/gpt-5.6-sol",
+            model: "openai/gpt-6.2-astra",
             reasoningEffort: "max",
             providerSelections: {
               openai: { mode: "api_key" },
@@ -216,7 +216,7 @@ describe("automation create route", () => {
         expect(mockStore.bindAutomationInsert).toHaveBeenCalledWith(
           expect.objectContaining({
             harness: "codex",
-            model: "openai/gpt-5.6-sol",
+            model: "openai/gpt-6.2-astra",
             reasoning_effort: "max",
           })
         );

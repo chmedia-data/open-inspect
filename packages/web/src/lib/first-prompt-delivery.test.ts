@@ -3,7 +3,7 @@ import { firstPromptDelivery, type FirstPromptDelivery } from "./first-prompt-de
 
 const prompt: Parameters<FirstPromptDelivery["send"]>[1] = {
   content: "Fix the bug",
-  model: "openai/gpt-5.4",
+  model: "openai/gpt-6.1-terra",
   reasoningEffort: "high",
   attachments: [{ attachmentId: "attachment-1", name: "screenshot.png" }],
 };

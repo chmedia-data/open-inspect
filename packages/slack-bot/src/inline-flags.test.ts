@@ -10,7 +10,7 @@ describe("resolveInlinePromptOptions", () => {
   const defaults = { model: "anthropic/claude-sonnet-4-6", reasoningEffort: "high" };
   const enabledModels = [
     "anthropic/claude-sonnet-4-6",
-    "openai/gpt-5.6-sol",
+    "openai/gpt-6.2-astra",
   ] satisfies ValidModel[];
   const sessionDefaults = {
     model: "anthropic/claude-sonnet-4-6",
@@ -20,7 +20,7 @@ describe("resolveInlinePromptOptions", () => {
   it("resolves combined overrides against the inline model", () => {
     expect(
       resolveInlinePromptOptions(
-        { model: "openai/gpt-5.6-sol", reasoningEffort: "xhigh" },
+        { model: "openai/gpt-6.2-astra", reasoningEffort: "xhigh" },
         defaults,
         enabledModels
       )
@@ -28,19 +28,19 @@ describe("resolveInlinePromptOptions", () => {
       ok: true,
       turnPlan: {
         sessionDefaults,
-        promptOverrides: { model: "openai/gpt-5.6-sol", reasoningEffort: "xhigh" },
-        effective: { model: "openai/gpt-5.6-sol", reasoningEffort: "xhigh" },
+        promptOverrides: { model: "openai/gpt-6.2-astra", reasoningEffort: "xhigh" },
+        effective: { model: "openai/gpt-6.2-astra", reasoningEffort: "xhigh" },
       },
     });
   });
 
   it("normalizes bare model ids and preserves a compatible default effort", () => {
-    expect(resolveInlinePromptOptions({ model: "gpt-5.6-sol" }, defaults, enabledModels)).toEqual({
+    expect(resolveInlinePromptOptions({ model: "gpt-6.2-astra" }, defaults, enabledModels)).toEqual({
       ok: true,
       turnPlan: {
         sessionDefaults,
-        promptOverrides: { model: "openai/gpt-5.6-sol", reasoningEffort: "high" },
-        effective: { model: "openai/gpt-5.6-sol", reasoningEffort: "high" },
+        promptOverrides: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
+        effective: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
       },
     });
   });
@@ -49,23 +49,23 @@ describe("resolveInlinePromptOptions", () => {
     expect(
       resolveInlinePromptOptions(
         { reasoningEffort: "high" },
-        { model: "openai/gpt-5.6-sol", reasoningEffort: "xhigh" },
+        { model: "openai/gpt-6.2-astra", reasoningEffort: "xhigh" },
         ["anthropic/claude-sonnet-4-6"]
       )
     ).toEqual({
       ok: true,
       turnPlan: {
-        sessionDefaults: { model: "openai/gpt-5.6-sol", reasoningEffort: "xhigh" },
+        sessionDefaults: { model: "openai/gpt-6.2-astra", reasoningEffort: "xhigh" },
         promptOverrides: { reasoningEffort: "high" },
-        effective: { model: "openai/gpt-5.6-sol", reasoningEffort: "high" },
+        effective: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
       },
     });
   });
 
   it("rejects disabled models and incompatible reasoning", () => {
     expect(
-      resolveInlinePromptOptions({ model: "openai/gpt-5.5" }, defaults, enabledModels)
-    ).toEqual({ ok: false, error: 'Model "openai/gpt-5.5" is not enabled.' });
+      resolveInlinePromptOptions({ model: "openai/gpt-6.2-sol" }, defaults, enabledModels)
+    ).toEqual({ ok: false, error: 'Model "openai/gpt-6.2-sol" is not enabled.' });
     expect(resolveInlinePromptOptions({ reasoningEffort: "max" }, defaults, enabledModels)).toEqual(
       {
         ok: true,
@@ -78,14 +78,14 @@ describe("resolveInlinePromptOptions", () => {
     );
     expect(
       resolveInlinePromptOptions(
-        { model: "openai/gpt-5.6-sol", reasoningEffort: "max" },
+        { model: "openai/gpt-6.2-astra", reasoningEffort: "none" },
         defaults,
         enabledModels
       )
     ).toEqual({
       ok: false,
       error:
-        'Reasoning effort "max" is not valid for "openai/gpt-5.6-sol". Supported values: none, low, medium, high, xhigh.',
+        'Reasoning effort "none" is not valid for "openai/gpt-6.2-astra". Supported values: low, medium, high, xhigh, max.',
     });
   });
 
@@ -120,7 +120,7 @@ describe("sessionLaunchPlanSchema", () => {
     expect(
       sessionLaunchPlanSchema.parse({
         sessionDefaults: { model: "anthropic/claude-sonnet-4-6", reasoningEffort: "high" },
-        promptOverrides: { model: "openai/gpt-5.4" },
+        promptOverrides: { model: "openai/gpt-6.1-terra" },
       })
     ).toEqual({
       sessionDefaults: { model: "anthropic/claude-sonnet-4-6", reasoningEffort: "high" },

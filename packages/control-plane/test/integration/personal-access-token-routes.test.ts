@@ -620,7 +620,7 @@ describe("choosing models with a token", () => {
   });
 
   it("rejects an unknown, disabled or harness-incompatible model on create", async () => {
-    await enableOnly([ENABLED, "openai/gpt-5.4"]);
+    await enableOnly([ENABLED, "openai/gpt-6.1-terra"]);
     const creator = await issueToken(OWNER, ["sessions.create"]);
     const create = (body: Record<string, unknown>) =>
       withToken(creator, "/sessions", { method: "POST", body: { title: "t", ...body } });
@@ -635,7 +635,7 @@ describe("choosing models with a token", () => {
     expect(disabled.status).toBe(400);
     expect((await disabled.json<{ error: string }>()).error).toContain("is not enabled");
 
-    const mismatch = await create({ model: "openai/gpt-5.4", harness: "claude" });
+    const mismatch = await create({ model: "openai/gpt-6.1-terra", harness: "claude" });
     expect(mismatch.status).toBe(400);
     expect((await mismatch.json<{ error: string }>()).error).toContain("cannot run on the Claude");
 

@@ -57,7 +57,7 @@ vi.mock("../sessions/session-launcher", () => ({
   loadAuthoritativeSlackLaunchSettings: vi.fn(),
   startSessionAndSendPrompt: vi.fn(async () => ({
     sessionId: "session-1",
-    sessionDefaults: { model: "openai/gpt-5.4", reasoningEffort: "high" },
+    sessionDefaults: { model: "openai/gpt-6.1-terra", reasoningEffort: "high" },
     differsFromUserDefaults: false,
   })),
 }));
@@ -84,11 +84,11 @@ const TURN_PLAN = {
     reasoningEffort: "high" as const,
   },
   promptOverrides: {
-    model: "openai/gpt-5.6-sol" as const,
+    model: "openai/gpt-6.2-astra" as const,
     reasoningEffort: "high" as const,
   },
   effective: {
-    model: "openai/gpt-5.6-sol" as const,
+    model: "openai/gpt-6.2-astra" as const,
     reasoningEffort: "high" as const,
   },
 };
@@ -290,11 +290,11 @@ describe("handleTargetSelection", () => {
     vi.mocked(getLegacyPendingRequest).mockResolvedValue({
       message: "Fix the deploy",
       userId: "U123",
-      inlinePromptOptions: { model: "openai/gpt-5.6-sol", reasoningEffort: "high" },
+      inlinePromptOptions: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
     });
     const launchSettings = {
       modelSource: "app-home" as const,
-      enabledModels: ["openai/gpt-5.6-sol" as const],
+      enabledModels: ["openai/gpt-6.2-astra" as const],
       slackConfig: { harness: "opencode" as const },
       userPreferences: {
         model: "anthropic/claude-sonnet-4-6",
@@ -318,7 +318,7 @@ describe("handleTargetSelection", () => {
       expect.objectContaining({
         launchPlan: {
           sessionDefaults: {
-            model: "openai/gpt-5.6-sol",
+            model: "openai/gpt-6.2-astra",
             reasoningEffort: "high",
           },
         },

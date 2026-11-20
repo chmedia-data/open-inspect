@@ -64,8 +64,8 @@ describe("readEnvConfig", () => {
     expect(() => readEnvConfig({ ...REQUIRED, DEFAULT_MODEL: "acme/not-a-model" })).toThrow(
       'DEFAULT_MODEL "acme/not-a-model" is not a model in the catalog'
     );
-    expect(readEnvConfig({ ...REQUIRED, DEFAULT_MODEL: "openai/gpt-5.5" }).DEFAULT_MODEL).toBe(
-      "openai/gpt-5.5"
+    expect(readEnvConfig({ ...REQUIRED, DEFAULT_MODEL: "openai/gpt-6.2-sol" }).DEFAULT_MODEL).toBe(
+      "openai/gpt-6.2-sol"
     );
   });
 

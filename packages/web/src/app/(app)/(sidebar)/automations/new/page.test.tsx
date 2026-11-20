@@ -17,7 +17,11 @@ afterEach(cleanup);
 
 // Mutable per-test inputs (vi.mock factories are hoisted, so they close over these).
 let search = "";
-let enabledModelsValue: string[] = [DEFAULT_MODEL, "anthropic/claude-opus-4-8", "openai/gpt-5.5"];
+let enabledModelsValue: string[] = [
+  DEFAULT_MODEL,
+  "anthropic/claude-opus-4-8",
+  "openai/gpt-6.2-sol",
+];
 let canCreate = true;
 let sourceAutomation: Record<string, unknown> | null = null;
 let sourcesById: Record<string, Record<string, unknown>> = {};
@@ -146,7 +150,7 @@ vi.mock("@/components/ui/combobox", () => ({
 
 beforeEach(() => {
   search = "";
-  enabledModelsValue = [DEFAULT_MODEL, "anthropic/claude-opus-4-8", "openai/gpt-5.5"];
+  enabledModelsValue = [DEFAULT_MODEL, "anthropic/claude-opus-4-8", "openai/gpt-6.2-sol"];
   canCreate = true;
   sourceAutomation = null;
   sourcesById = {};
@@ -379,7 +383,7 @@ describe("NewAutomationPage duplicate", () => {
     triggerType: "schedule",
     scheduleCron: "30 6 * * 1",
     scheduleTz: "UTC",
-    model: "openai/gpt-5.5",
+    model: "openai/gpt-6.2-sol",
     reasoningEffort: null,
     eventType: null,
     triggerConfig: null,
@@ -395,7 +399,7 @@ describe("NewAutomationPage duplicate", () => {
 
     expect(screen.getByDisplayValue("Nightly review (copy)")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Review yesterday's commits")).toBeInTheDocument();
-    expect(screen.getByText("gpt 5.5")).toBeInTheDocument();
+    expect(screen.getByText("gpt-6.2 sol")).toBeInTheDocument();
     expect(screen.getByText(/duplicating/i)).toBeInTheDocument();
   });
 

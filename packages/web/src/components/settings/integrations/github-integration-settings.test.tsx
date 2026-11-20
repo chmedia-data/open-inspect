@@ -49,8 +49,8 @@ vi.mock("@/hooks/use-enabled-models", () => ({
       {
         category: "OpenAI",
         models: [
-          { id: "openai/gpt-5.4", name: "GPT 5.4" },
-          { id: "openai/gpt-5.6-sol", name: "GPT 5.6 Sol" },
+          { id: "openai/gpt-6.1-terra", name: "GPT-6.1 Terra" },
+          { id: "openai/gpt-6.2-astra", name: "GPT-6.2 Astra" },
         ],
       },
     ],
@@ -585,7 +585,7 @@ describe("GitHubIntegrationSettings", () => {
       global: {
         defaults: {
           autoReviewOnOpen: true,
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-6.1-terra",
           reasoningEffort: "high",
         },
       },
@@ -606,7 +606,7 @@ describe("GitHubIntegrationSettings", () => {
 
     await user.click(model);
     expect(screen.queryByRole("option", { name: "Use system default" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "GPT 5.4" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "GPT-6.1 Terra" })).not.toBeInTheDocument();
     await user.click(await screen.findByRole("option", { name: "Claude Sonnet 4.6" }));
     expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -634,7 +634,7 @@ describe("GitHubIntegrationSettings", () => {
       global: {
         defaults: {
           harness: "codex",
-          model: "openai/gpt-5.6-sol",
+          model: "openai/gpt-6.2-astra",
           reasoningEffort: "max",
         },
       },
@@ -649,7 +649,7 @@ describe("GitHubIntegrationSettings", () => {
     expect(screen.queryByRole("option", { name: "none" })).not.toBeInTheDocument();
   });
 
-  it.each([undefined, "anthropic/claude-sonnet-4-6", "openai/gpt-5.4"])(
+  it.each([undefined, "anthropic/claude-sonnet-4-6", "openai/gpt-6.1-terra"])(
     "requires a repo model with an explicit Claude harness despite global model=%s",
     async (inheritedModel) => {
       const user = userEvent.setup();
@@ -674,7 +674,7 @@ describe("GitHubIntegrationSettings", () => {
 
       await user.click(model);
       expect(screen.queryByRole("option", { name: "Use global model" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("option", { name: "GPT 5.4" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: "GPT-6.1 Terra" })).not.toBeInTheDocument();
       await user.click(await screen.findByRole("option", { name: "Claude Sonnet 4.6" }));
       await user.click(within(row).getByRole("button", { name: /^save$/i }));
 
@@ -759,15 +759,15 @@ describe("GitHubIntegrationSettings", () => {
     await screen.findByRole("option", { name: "Claude Sonnet 4.6" });
     expect(screen.getByRole("option", { name: "Use global model" })).toBeInTheDocument();
     // Global harness is Claude Agent: GPT models are not offered for this repo.
-    expect(screen.queryByRole("option", { name: "GPT 5.4" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "GPT-6.1 Terra" })).toBeNull();
   }, 20000);
 
   it.each([
     { globalModel: "anthropic/claude-sonnet-4-6", repoModel: undefined, warns: false },
     { globalModel: undefined, repoModel: undefined, warns: false },
     { globalModel: "openai/gpt-5", repoModel: undefined, warns: false },
-    { globalModel: "openai/gpt-5.4", repoModel: undefined, warns: true },
-    { globalModel: "anthropic/claude-sonnet-4-6", repoModel: "openai/gpt-5.4", warns: true },
+    { globalModel: "openai/gpt-6.1-terra", repoModel: undefined, warns: true },
+    { globalModel: "anthropic/claude-sonnet-4-6", repoModel: "openai/gpt-6.1-terra", warns: true },
   ])("warns without blocking sparse saves: %j", async (selection) => {
     const user = userEvent.setup();
     setupSWR({
@@ -803,14 +803,14 @@ describe("GitHubIntegrationSettings", () => {
   it("updates the non-blocking warning when the global harness changes", async () => {
     setupSWR({
       global: { defaults: { model: "anthropic/claude-sonnet-4-6" } },
-      repos: [{ repo: "acme/web", settings: { model: "openai/gpt-5.4" } }],
+      repos: [{ repo: "acme/web", settings: { model: "openai/gpt-6.1-terra" } }],
     });
     const { rerender } = render(<GitHubIntegrationSettings />);
     expect(screen.queryByText(/Sessions using this default model will be refused/)).toBeNull();
 
     setupSWR({
       global: { defaults: { harness: "claude", model: "anthropic/claude-sonnet-4-6" } },
-      repos: [{ repo: "acme/web", settings: { model: "openai/gpt-5.4" } }],
+      repos: [{ repo: "acme/web", settings: { model: "openai/gpt-6.1-terra" } }],
     });
     rerender(<GitHubIntegrationSettings />);
     const row = repoOverrideRow("acme/web");
@@ -828,11 +828,11 @@ describe("GitHubIntegrationSettings", () => {
   it("keeps a sparse effort visible when the inherited harness makes it incompatible", async () => {
     const user = userEvent.setup();
     setupSWR({
-      global: { defaults: { model: "openai/gpt-5.6-sol" } },
+      global: { defaults: { model: "openai/gpt-6-sol" } },
       repos: [
         {
           repo: "acme/web",
-          settings: { model: "openai/gpt-5.6-sol", reasoningEffort: "none" },
+          settings: { model: "openai/gpt-6-sol", reasoningEffort: "none" },
         },
       ],
       availableRepos: [repo("acme/web")],
@@ -845,11 +845,11 @@ describe("GitHubIntegrationSettings", () => {
     expect(within(row).queryByText(/Sessions using this default model will be refused/)).toBeNull();
 
     setupSWR({
-      global: { defaults: { harness: "codex", model: "openai/gpt-5.6-sol" } },
+      global: { defaults: { harness: "codex", model: "openai/gpt-6-sol" } },
       repos: [
         {
           repo: "acme/web",
-          settings: { model: "openai/gpt-5.6-sol", reasoningEffort: "none" },
+          settings: { model: "openai/gpt-6-sol", reasoningEffort: "none" },
         },
       ],
       availableRepos: [repo("acme/web")],
@@ -860,7 +860,7 @@ describe("GitHubIntegrationSettings", () => {
     expect(
       within(row).getByText(/Sessions using this default model will be refused/)
     ).toHaveTextContent(
-      'Reasoning effort "none" cannot run on openai/gpt-5.6-sol with the Codex harness.'
+      'Reasoning effort "none" cannot run on openai/gpt-6-sol with the Codex harness.'
     );
 
     await selectAutoReviewMode(row, /override for this repo/i);
@@ -870,7 +870,7 @@ describe("GitHubIntegrationSettings", () => {
       expect.objectContaining({
         body: JSON.stringify({
           settings: {
-            model: "openai/gpt-5.6-sol",
+            model: "openai/gpt-6-sol",
             reasoningEffort: "none",
             autoReviewOnOpen: true,
           },
@@ -886,7 +886,7 @@ describe("GitHubIntegrationSettings", () => {
       repos: [
         {
           repo: "acme/web",
-          settings: { harness: "opencode", model: "openai/gpt-5.4", reasoningEffort: "high" },
+          settings: { harness: "opencode", model: "openai/gpt-6.1-terra", reasoningEffort: "high" },
         },
       ],
       availableRepos: [repo("acme/web")],
@@ -923,7 +923,7 @@ describe("GitHubIntegrationSettings", () => {
     expect(screen.queryByText(/deployment default|fall back|Sessions will run on/)).toBeNull();
   });
 
-  it.each([undefined, "openai/gpt-5.4", "anthropic/unknown-model"])(
+  it.each([undefined, "openai/gpt-6.1-terra", "anthropic/unknown-model"])(
     "blocks a missing, incompatible, or impossible stored explicit model at both levels: %s",
     async (model) => {
       const user = userEvent.setup();
@@ -967,7 +967,7 @@ describe("GitHubIntegrationSettings", () => {
 
     const row = repoOverrideRow("acme/web");
     await user.click(within(row).getByRole("combobox", { name: "Model" }));
-    expect(screen.getByRole("option", { name: "GPT 5.4" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "GPT-6.1 Terra" })).toBeInTheDocument();
     await user.click(await screen.findByRole("option", { name: "Use global model" }));
     await selectAutoReviewMode(row, /override for this repo/i);
     await user.click(within(row).getByRole("button", { name: /^save$/i }));

@@ -37,7 +37,7 @@ function codexAutomation(id: string): AutomationRow {
     event_type: null,
     trigger_config: null,
     trigger_auth_data: null,
-    model: "openai/gpt-5.6-sol",
+    model: "openai/gpt-6.2-astra",
     reasoning_effort: "max",
     enabled: 1,
     next_run_at: null,
@@ -75,11 +75,11 @@ describe("harness policy with real D1 and Durable Object storage", () => {
   }
 
   it("resolves native enabled defaults without changing legacy defaults", async () => {
-    await setEnabledModels([DEFAULT_MODEL, "openai/gpt-5.6-sol"]);
+    await setEnabledModels([DEFAULT_MODEL, "openai/gpt-6.2-astra"]);
     await expect(
       resolveHarnessSelection(env.DB, { harness: "codex", defaultModel: DEFAULT_MODEL })
     ).resolves.toEqual({
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       reasoningEffort: "low",
     });
     await expect(
@@ -92,10 +92,10 @@ describe("harness policy with real D1 and Durable Object storage", () => {
 
   it("accepts native API-key routing when no connected-account default exists", async () => {
     await expect(
-      validateHarnessAutomationAuth(env.DB, "codex", "openai/gpt-5.6-sol", {})
+      validateHarnessAutomationAuth(env.DB, "codex", "openai/gpt-6.2-astra", {})
     ).resolves.toBeUndefined();
     await expect(
-      validateHarnessAutomationAuth(env.DB, "codex", "openai/gpt-5.6-sol", {
+      validateHarnessAutomationAuth(env.DB, "codex", "openai/gpt-6.2-astra", {
         openai: { mode: "api_key" },
         anthropic: { mode: "provider_account", accountId: "unreachable-stale-account" },
       })
@@ -113,17 +113,17 @@ describe("harness policy with real D1 and Durable Object storage", () => {
     });
     const { stub } = await initNamedSession(`harness-policy-${crypto.randomUUID()}`, {
       harness: "codex",
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       reasoningEffort: "max",
       providerAuth,
     });
     expect(await queryDO(stub, "SELECT harness, model, reasoning_effort FROM session")).toEqual([
-      { harness: "codex", model: "openai/gpt-5.6-sol", reasoning_effort: "max" },
+      { harness: "codex", model: "openai/gpt-6.2-astra", reasoning_effort: "max" },
     ]);
   });
 
   it("rejects a prompt without inserting a message after its native model is disabled", async () => {
-    await setEnabledModels([DEFAULT_MODEL, "openai/gpt-5.6-sol"]);
+    await setEnabledModels([DEFAULT_MODEL, "openai/gpt-6.2-astra"]);
     const providerAuth = await resolveSessionProviderAuth(env.DB, {
       harness: "codex",
       unattended: false,
@@ -131,7 +131,7 @@ describe("harness policy with real D1 and Durable Object storage", () => {
     });
     const { stub } = await initNamedSession(`harness-disable-${crypto.randomUUID()}`, {
       harness: "codex",
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       providerAuth,
     });
     await setEnabledModels([DEFAULT_MODEL]);
@@ -148,36 +148,36 @@ describe("harness policy with real D1 and Durable Object storage", () => {
   describe("automation updates", () => {
     const store = () => new AutomationStore(env.DB);
 
-    it("gives a model-only change the new model's default instead of an unsupported inherited effort", async () => {
-      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-5.6-sol", "openai/gpt-5.5"]);
+    it("keeps a supported inherited effort on a model-only change", async () => {
+      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-6.2-astra", "openai/gpt-6.2-sol"]);
       await store().create(codexAutomation("codex-model-only"));
-      const response = await updateAutomation("codex-model-only", { model: "openai/gpt-5.5" });
+      const response = await updateAutomation("codex-model-only", { model: "openai/gpt-6.2-sol" });
       expect(response.status).toBe(200);
       expect(await store().getById("codex-model-only")).toMatchObject({
-        model: "openai/gpt-5.5",
-        reasoning_effort: "medium",
+        model: "openai/gpt-6.2-sol",
+        reasoning_effort: "max",
       });
     });
 
     it("persists a valid effort when only the harness changes", async () => {
-      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-5.6-sol"]);
+      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-6.2-astra"]);
       await store().create(codexAutomation("codex-to-opencode"));
       const response = await updateAutomation("codex-to-opencode", { harness: "opencode" });
       expect(response.status).toBe(200);
       expect(await store().getById("codex-to-opencode")).toMatchObject({
         harness: "opencode",
-        reasoning_effort: null,
+        reasoning_effort: "max",
       });
     });
 
     it("does not revalidate execution for a rename that resubmits unchanged settings", async () => {
-      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-5.6-sol"]);
+      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-6.2-astra"]);
       await store().create(codexAutomation("codex-rename"));
       await setEnabledModels([DEFAULT_MODEL]);
       const response = await updateAutomation("codex-rename", {
         name: "Renamed",
         harness: "codex",
-        model: "openai/gpt-5.6-sol",
+        model: "openai/gpt-6.2-astra",
         reasoningEffort: "max",
       });
       expect(response.status).toBe(200);
@@ -197,7 +197,7 @@ describe("harness policy with real D1 and Durable Object storage", () => {
       });
       return initNamedSession(`${name}-${crypto.randomUUID()}`, {
         harness: "codex",
-        model: "openai/gpt-5.6-sol",
+        model: "openai/gpt-6.2-astra",
         reasoningEffort: "max",
         providerAuth,
       });
@@ -211,8 +211,8 @@ describe("harness policy with real D1 and Durable Object storage", () => {
       });
     }
 
-    it("dispatches a model override with the override model's default effort", async () => {
-      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-5.6-sol", "openai/gpt-5.5"]);
+    it("dispatches a model override with the session effort the override model supports", async () => {
+      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-6.2-astra", "openai/gpt-6.2-sol"]);
       const { stub, sessionName } = await codexSession("prompt-override");
       await seedSandboxAuth(stub, { authToken: SANDBOX_TOKEN, sandboxId: SANDBOX_ID });
       const { ws } = await openSandboxWs(sessionName, {
@@ -226,17 +226,20 @@ describe("harness policy with real D1 and Durable Object storage", () => {
         const dispatched = collectMessages(ws!, {
           until: (message) => message.type === "prompt",
         });
-        const response = await prompt(stub, { content: "Use 5.5", model: "openai/gpt-5.5" });
+        const response = await prompt(stub, {
+          content: "Use 6.2 Sol",
+          model: "openai/gpt-6.2-sol",
+        });
         expect(response.status).toBe(200);
         expect(await dispatched).toContainEqual(
           expect.objectContaining({
             type: "prompt",
-            model: "openai/gpt-5.5",
-            reasoningEffort: "medium",
+            model: "openai/gpt-6.2-sol",
+            reasoningEffort: "max",
           })
         );
         expect(await queryDO(stub, "SELECT model, reasoning_effort, status FROM messages")).toEqual(
-          [{ model: "openai/gpt-5.5", reasoning_effort: null, status: "processing" }]
+          [{ model: "openai/gpt-6.2-sol", reasoning_effort: null, status: "processing" }]
         );
       } finally {
         await closeWebSocket(ws!, { bestEffort: true });
@@ -244,7 +247,7 @@ describe("harness policy with real D1 and Durable Object storage", () => {
     });
 
     it("returns the original message for an identical retry after the model is disabled", async () => {
-      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-5.6-sol"]);
+      await setEnabledModels([DEFAULT_MODEL, "openai/gpt-6.2-astra"]);
       const { stub } = await codexSession("prompt-retry");
       const first = await prompt(stub, { content: "Once", clientRequestId: "req-1" });
       expect(first.status).toBe(200);

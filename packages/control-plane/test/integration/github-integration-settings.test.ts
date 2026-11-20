@@ -53,7 +53,7 @@ describe("GitHub integration settings harness", () => {
     ["global", globalEndpoint, (s: object) => ({ defaults: s })],
     ["repository", repoEndpoint, (s: object) => s],
   ])("rejects an incompatible %s harness and model on save", async (_level, url, wrap) => {
-    const rejected = await put(url, wrap({ harness: "claude", model: "openai/gpt-5.5" }));
+    const rejected = await put(url, wrap({ harness: "claude", model: "openai/gpt-6.2-sol" }));
     expect(rejected.status).toBe(400);
     expect(await rejected.text()).toContain("cannot run on the Claude Agent harness");
 
@@ -69,7 +69,7 @@ describe("GitHub integration settings harness", () => {
     ["global", globalEndpoint, (s: object) => ({ defaults: s })],
     ["repository", repoEndpoint, (s: object) => s],
   ])("accepts Codex max reasoning for %s settings", async (_level, url, wrap) => {
-    const selection = { harness: "codex", model: "openai/gpt-5.6-sol" };
+    const selection = { harness: "codex", model: "openai/gpt-6.2-astra" };
     expect((await put(url, wrap({ ...selection, reasoningEffort: "max" }))).status).toBe(200);
 
     const resolved = await serviceFetch(resolvedEndpoint, { service: "github-bot" });
@@ -82,11 +82,11 @@ describe("GitHub integration settings harness", () => {
     ["global", globalEndpoint, (s: object) => ({ defaults: s })],
     ["repository", repoEndpoint, (s: object) => s],
   ])("rejects Codex none reasoning for %s settings", async (_level, url, wrap) => {
-    const selection = { harness: "codex", model: "openai/gpt-5.6-sol" };
+    const selection = { harness: "codex", model: "openai/gpt-6.2-astra" };
     const rejected = await put(url, wrap({ ...selection, reasoningEffort: "none" }));
     expect(rejected.status).toBe(400);
     expect(await rejected.json<{ error: string }>()).toEqual({
-      error: 'Reasoning effort "none" cannot run on openai/gpt-5.6-sol with the Codex harness.',
+      error: 'Reasoning effort "none" cannot run on openai/gpt-6.2-astra with the Codex harness.',
     });
   });
 
@@ -94,12 +94,12 @@ describe("GitHub integration settings harness", () => {
     expect(
       (
         await put(globalEndpoint, {
-          defaults: { harness: "codex", model: "openai/gpt-5.6-sol" },
+          defaults: { harness: "codex", model: "openai/gpt-6.2-astra" },
         })
       ).status
     ).toBe(200);
     expect(
-      (await put(repoEndpoint, { model: "openai/gpt-5.6-sol", reasoningEffort: "max" })).status
+      (await put(repoEndpoint, { model: "openai/gpt-6.2-astra", reasoningEffort: "max" })).status
     ).toBe(200);
     let resolved = await serviceFetch(resolvedEndpoint, { service: "github-bot" });
     expect(await resolved.json()).toMatchObject({ config: { reasoningEffort: "max" } });
@@ -117,11 +117,11 @@ describe("GitHub integration settings harness", () => {
         })
       ).status
     ).toBe(200);
-    expect((await put(repoEndpoint, { model: "openai/gpt-5.5" })).status).toBe(200);
+    expect((await put(repoEndpoint, { model: "openai/gpt-6.2-sol" })).status).toBe(200);
 
     const res = await serviceFetch(resolvedEndpoint, { service: "github-bot" });
     expect(await res.json()).toMatchObject({
-      config: { harness: "claude", model: "openai/gpt-5.5" },
+      config: { harness: "claude", model: "openai/gpt-6.2-sol" },
     });
   });
 });

@@ -826,7 +826,7 @@ describe("POST /sessions/:parentId/children — spawn child", () => {
 
   it("uses an enabled fallback when the inherited parent model was disabled", async () => {
     const { parentName, sandboxToken, store } = await setupParent({
-      model: "openai/gpt-5.5",
+      model: "openai/gpt-6.2-sol",
       reasoningEffort: "xhigh",
     });
 

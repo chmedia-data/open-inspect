@@ -25,7 +25,7 @@ vi.mock("@/hooks/use-current-user-authorization", () => ({
 
 vi.mock("@/hooks/use-enabled-models", () => ({
   useEnabledModels: () => ({
-    enabledModels: ["anthropic/claude-sonnet-4-6", "openai/gpt-5.4"],
+    enabledModels: ["anthropic/claude-sonnet-4-6", "openai/gpt-6.1-terra"],
     enabledModelOptions: [
       {
         category: "Anthropic",
@@ -33,7 +33,7 @@ vi.mock("@/hooks/use-enabled-models", () => ({
       },
       {
         category: "OpenAI",
-        models: [{ id: "openai/gpt-5.4", name: "GPT 5.4" }],
+        models: [{ id: "openai/gpt-6.1-terra", name: "GPT-6.1 Terra" }],
       },
     ],
     loading: false,
@@ -214,7 +214,7 @@ describe("SlackIntegrationSettings", () => {
 
   it("closes the open harness menu when permission is revoked without changing the draft", async () => {
     const user = userEvent.setup();
-    setupSWR({ global: { defaults: { model: "openai/gpt-5.4" } } });
+    setupSWR({ global: { defaults: { model: "openai/gpt-6.1-terra" } } });
     const { rerender } = render(<SlackIntegrationSettings />);
     const harness = screen.getByRole("combobox", { name: "Agent harness" });
     const model = screen.getByRole("combobox", { name: "Default model" });
@@ -230,7 +230,7 @@ describe("SlackIntegrationSettings", () => {
     authorization.canManageGlobal = true;
     rerender(<SlackIntegrationSettings />);
     expect(harness).toHaveTextContent("OpenCode");
-    expect(model).toHaveTextContent("GPT 5.4");
+    expect(model).toHaveTextContent("GPT-6.1 Terra");
     expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -326,12 +326,12 @@ describe("SlackIntegrationSettings", () => {
 
     const modelSection = screen.getByText("Default model").closest("div")!;
     await user.click(within(modelSection).getByRole("combobox"));
-    await user.click(await screen.findByRole("option", { name: "GPT 5.4" }));
+    await user.click(await screen.findByRole("option", { name: "GPT-6.1 Terra" }));
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     const [, init] = fetchMock.mock.calls[0];
     const body = JSON.parse(init.body as string) as { settings: SlackGlobalConfig };
-    expect(body.settings.defaults?.model).toBe("openai/gpt-5.4");
+    expect(body.settings.defaults?.model).toBe("openai/gpt-6.1-terra");
   });
 
   it("explains refusal and recovery when the saved default model is disabled", () => {
@@ -351,7 +351,7 @@ describe("SlackIntegrationSettings", () => {
       global: {
         defaults: {
           agentNotificationsEnabled: true,
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-6.1-terra",
           mentionsPolicy: "strip",
           routingRules: [{ keyword: "frontend", target: "acme/web" }],
         },
@@ -382,7 +382,7 @@ describe("SlackIntegrationSettings", () => {
         defaults: {
           agentNotificationsEnabled: true,
           mentionsPolicy: "strip",
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-6.1-terra",
           routingRules: [{ keyword: "frontend", target: "acme/web" }],
         },
       },
@@ -406,7 +406,7 @@ describe("SlackIntegrationSettings", () => {
     expect(body.settings.defaults).toEqual({
       agentNotificationsEnabled: true,
       mentionsPolicy: "strip",
-      model: "openai/gpt-5.4",
+      model: "openai/gpt-6.1-terra",
       routingRules: [{ keyword: "frontend", target: "acme/web" }],
       sessionInstructions: "Prefer minimal diffs.",
       unboundChannels: "reject",
@@ -674,7 +674,7 @@ describe("SlackIntegrationSettings", () => {
             agentNotificationsEnabled: true,
             mentionsPolicy: "allow",
             unboundChannels: "reject",
-            model: "openai/gpt-5.4",
+            model: "openai/gpt-6.1-terra",
             sessionInstructions: "Prefer minimal diffs.",
           },
         },
@@ -703,7 +703,7 @@ describe("SlackIntegrationSettings", () => {
         agentNotificationsEnabled: true,
         mentionsPolicy: "allow",
         unboundChannels: "reject",
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-6.1-terra",
         sessionInstructions: "Prefer minimal diffs.",
         routingRules: [{ keyword: "Frontend", target: "acme/web" }],
       });
@@ -945,7 +945,7 @@ describe("SlackIntegrationSettings harness", () => {
     expect(harness).toHaveTextContent("OpenCode");
     expect(harness).toHaveAttribute("aria-describedby", "slack-harness-help");
     expect(await optionNames(user, harness)).toEqual(HARNESS_IDS.map(getHarnessLabel));
-    expect(await optionNames(user, model)).toEqual(["Claude Sonnet 4.6", "GPT 5.4"]);
+    expect(await optionNames(user, model)).toEqual(["Claude Sonnet 4.6", "GPT-6.1 Terra"]);
 
     await user.click(harness);
     await user.click(
@@ -959,7 +959,7 @@ describe("SlackIntegrationSettings harness", () => {
 
   it("clears a default model the selected harness cannot run and requires a new one before saving", async () => {
     const user = userEvent.setup();
-    setupSWR({ global: { defaults: { model: "openai/gpt-5.4", mentionsPolicy: "strip" } } });
+    setupSWR({ global: { defaults: { model: "openai/gpt-6.1-terra", mentionsPolicy: "strip" } } });
     fetchMock.mockResolvedValue(okJson({}));
     render(<SlackIntegrationSettings />);
     const harness = screen.getByRole("combobox", { name: "Agent harness" });

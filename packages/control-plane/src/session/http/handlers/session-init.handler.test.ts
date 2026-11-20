@@ -66,7 +66,7 @@ describe("Codex durable initialization", () => {
         repoName: null,
         userId: "owner",
         harness: "codex",
-        model: "openai/gpt-5.6-sol",
+        model: "openai/gpt-6.2-astra",
         ...overrides,
       }),
     });
@@ -77,14 +77,14 @@ describe("Codex durable initialization", () => {
     expect(repository.upsertSession).toHaveBeenCalledWith(
       expect.objectContaining({
         harness: "codex",
-        model: "openai/gpt-5.6-sol",
+        model: "openai/gpt-6.2-astra",
         reasoningEffort: "max",
       })
     );
   });
   it.each([
     { model: "bogus" },
-    { model: "openai/gpt-5.4" },
+    { model: "xai/grok-4.6" },
     { model: undefined },
     { reasoningEffort: "ultra" },
     { reasoningEffort: "none" },

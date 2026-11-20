@@ -5,12 +5,12 @@ describe("parseInlinePromptFlags", () => {
   it("parses model and reasoning flags in either supported form", () => {
     expect(
       parseInlinePromptFlags(
-        "!model openai/gpt-5.6-sol !reasoning:high investigate the failing test"
+        "!model openai/gpt-6.2-astra !reasoning:high investigate the failing test"
       )
     ).toEqual({
       ok: true,
       text: "investigate the failing test",
-      options: { model: "openai/gpt-5.6-sol", reasoningEffort: "high" },
+      options: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
     });
     expect(parseInlinePromptFlags("!reasoning low !model:claude-sonnet-4-6 fix it")).toEqual({
       ok: true,
@@ -20,14 +20,14 @@ describe("parseInlinePromptFlags", () => {
   });
 
   it("only treats a contiguous leading prefix as flags", () => {
-    expect(parseInlinePromptFlags("fix docs mentioning !model openai/gpt-5.6-sol")).toEqual({
+    expect(parseInlinePromptFlags("fix docs mentioning !model openai/gpt-6.2-astra")).toEqual({
       ok: true,
-      text: "fix docs mentioning !model openai/gpt-5.6-sol",
+      text: "fix docs mentioning !model openai/gpt-6.2-astra",
       options: {},
     });
-    expect(parseInlinePromptFlags("!unknown !model openai/gpt-5.6-sol fix it")).toEqual({
+    expect(parseInlinePromptFlags("!unknown !model openai/gpt-6.2-astra fix it")).toEqual({
       ok: true,
-      text: "!unknown !model openai/gpt-5.6-sol fix it",
+      text: "!unknown !model openai/gpt-6.2-astra fix it",
       options: {},
     });
   });

@@ -341,12 +341,12 @@ describe("Home", () => {
   });
 
   it("starts a user with no remembered model on the deployment default", async () => {
-    const deploymentDefault = "openai/gpt-5.4";
+    const deploymentDefault = "openai/gpt-6.1-terra";
     mocks.enabledModelsValue = [DEFAULT_MODEL, deploymentDefault];
     mocks.defaultModelValue = deploymentDefault;
     mocks.enabledModelOptionsValue.push({
       category: "OpenAI",
-      models: [{ id: deploymentDefault, name: "GPT-5.4", description: "" }],
+      models: [{ id: deploymentDefault, name: "GPT-6.1 Terra", description: "" }],
     });
     const user = userEvent.setup();
     render(<Home />);
@@ -358,12 +358,12 @@ describe("Home", () => {
   });
 
   it("persists provider authentication and restores it on the next visit", async () => {
-    const openAiModel = "openai/gpt-5.4";
+    const openAiModel = "openai/gpt-6.1-terra";
     const accountId = "a".repeat(32);
     mocks.enabledModelsValue = [DEFAULT_MODEL, openAiModel];
     mocks.enabledModelOptionsValue.push({
       category: "OpenAI",
-      models: [{ id: openAiModel, name: "GPT-5.4", description: "" }],
+      models: [{ id: openAiModel, name: "GPT-6.1 Terra", description: "" }],
     });
     mocks.providerAccountsValue = [activeOpenAiAccount(accountId)];
     localStorage.setItem("open-inspect-last-selected-model", openAiModel);
@@ -735,7 +735,7 @@ describe("Home", () => {
   });
 
   it("sends the default harness with a model it can run", async () => {
-    const openAiModel = "openai/gpt-5.4";
+    const openAiModel = "openai/gpt-6.1-terra";
     mocks.enabledModelsValue = [DEFAULT_MODEL, openAiModel];
     localStorage.setItem("open-inspect-last-selected-model", openAiModel);
     render(<Home />);
@@ -753,9 +753,9 @@ describe("Home", () => {
   });
 
   it("uses the Codex default effort when changing the model", async () => {
-    mocks.enabledModelsValue = ["openai/gpt-5.6-sol", "openai/gpt-6.1-sol"];
+    mocks.enabledModelsValue = ["openai/gpt-6.2-astra", "openai/gpt-6.1-sol"];
     localStorage.setItem("open-inspect-last-selected-harness", "codex");
-    localStorage.setItem("open-inspect-last-selected-model", "openai/gpt-5.6-sol");
+    localStorage.setItem("open-inspect-last-selected-model", "openai/gpt-6.2-astra");
     render(<Home />);
     await screen.findByRole("button", { name: "Agent, model and effort: codex" });
     fireEvent.click(screen.getByRole("button", { name: "Switch model to GPT-6.1" }));
@@ -772,7 +772,7 @@ describe("Home", () => {
   });
 
   it("restores a stored harness and switches an incompatible model to one it can run", async () => {
-    const openAiModel = "openai/gpt-5.4";
+    const openAiModel = "openai/gpt-6.1-terra";
     mocks.enabledModelsValue = [DEFAULT_MODEL, openAiModel];
     localStorage.setItem("open-inspect-last-selected-model", openAiModel);
     localStorage.setItem("open-inspect-last-selected-harness", "claude");
@@ -867,10 +867,10 @@ describe("Home", () => {
   });
 
   it("refuses to warm or send when the harness can run none of the enabled models", async () => {
-    const openAiModel = "openai/gpt-5.4";
+    const openAiModel = "openai/gpt-6.1-terra";
     mocks.enabledModelsValue = [openAiModel];
     mocks.enabledModelOptionsValue = [
-      { category: "OpenAI", models: [{ id: openAiModel, name: "GPT-5.4", description: "" }] },
+      { category: "OpenAI", models: [{ id: openAiModel, name: "GPT-6.1 Terra", description: "" }] },
     ];
     localStorage.setItem("open-inspect-last-selected-harness", "claude");
     render(<Home />);

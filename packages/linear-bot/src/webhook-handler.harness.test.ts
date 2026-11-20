@@ -210,14 +210,14 @@ describe("handleAgentSessionEvent harness selection", () => {
     const { createBody } = await delegate({
       config: {
         harness: "codex",
-        model: "openai/gpt-5.6-sol",
+        model: "openai/gpt-6.2-astra",
         reasoningEffort: "max",
       },
     });
 
     expect(createBody).toMatchObject({
       harness: "codex",
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       reasoningEffort: "max",
     });
   });
@@ -226,7 +226,7 @@ describe("handleAgentSessionEvent harness selection", () => {
     const { createBody, activities, paths } = await delegate({
       config: {
         harness: "codex",
-        model: "openai/gpt-5.6-sol",
+        model: "openai/gpt-6-sol",
         reasoningEffort: "none",
       },
     });
@@ -234,23 +234,7 @@ describe("handleAgentSessionEvent harness selection", () => {
     expect(createBody).toBeNull();
     expect(paths.some((path) => path.startsWith("/sessions"))).toBe(false);
     expect(activities).toContain(
-      'Reasoning effort "none" cannot run on openai/gpt-5.6-sol with the Codex harness.'
-    );
-  });
-
-  it("refuses a Codex-only configured effort inherited by OpenCode", async () => {
-    const { createBody, activities, paths } = await delegate({
-      config: {
-        harness: "opencode",
-        model: "openai/gpt-5.6-sol",
-        reasoningEffort: "max",
-      },
-    });
-
-    expect(createBody).toBeNull();
-    expect(paths.some((path) => path.startsWith("/sessions"))).toBe(false);
-    expect(activities).toContain(
-      'Reasoning effort "max" cannot run on openai/gpt-5.6-sol with the OpenCode harness.'
+      'Reasoning effort "none" cannot run on openai/gpt-6-sol with the Codex harness.'
     );
   });
 

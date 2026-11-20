@@ -107,7 +107,7 @@ describe("buildAppHomeView", () => {
   describe("agent harness", () => {
     const models = [
       { label: "Claude Haiku", value: "anthropic/claude-haiku-4-5" },
-      { label: "GPT 5.4", value: "openai/gpt-5.4" },
+      { label: "GPT-6.1 Terra", value: "openai/gpt-6.1-terra" },
     ];
 
     function render(state: {
@@ -181,13 +181,13 @@ describe("buildAppHomeView", () => {
       const { model, texts } = render({
         userHarness: "claude",
         workspaceHarness: "opencode",
-        currentModel: "openai/gpt-5.4",
+        currentModel: "openai/gpt-6.1-terra",
       });
 
       expect(model?.initial_option).toBeUndefined();
       expect(model?.placeholder?.text).toBe("Choose a model");
       expect(texts).toContain(
-        "Your model `openai/gpt-5.4` can't run on Claude Agent, so new requests are refused until you choose a model above."
+        "Your model `openai/gpt-6.1-terra` can't run on Claude Agent, so new requests are refused until you choose a model above."
       );
     });
 

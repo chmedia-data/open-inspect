@@ -28,7 +28,7 @@ const { authorization, modelOptions, useSWRMock, mutateMock, toastSuccess, toast
         category: "OpenAI",
         models: [
           { id: "openai/gpt-6-sol", name: "GPT 6 Sol", description: "" },
-          { id: "openai/gpt-5.6-sol", name: "GPT 5.6 Sol", description: "" },
+          { id: "openai/gpt-6.2-astra", name: "GPT-6.2 Astra", description: "" },
         ],
       },
     ] satisfies ModelCategory[],
@@ -421,7 +421,7 @@ describe("LinearIntegrationSettings harness", () => {
       settings: {
         defaults: {
           harness: "codex",
-          model: "openai/gpt-5.6-sol",
+          model: "openai/gpt-6.2-astra",
           reasoningEffort: "max",
         },
       },
@@ -557,11 +557,11 @@ describe("LinearIntegrationSettings harness", () => {
 
   it("keeps a sparse effort visible when the inherited harness makes it incompatible", async () => {
     setupSWR({
-      settings: { defaults: { model: "openai/gpt-5.6-sol" } },
+      settings: { defaults: { model: "openai/gpt-6-sol" } },
       overrides: [
         {
           repo: "acme/web",
-          settings: { model: "openai/gpt-5.6-sol", reasoningEffort: "none" },
+          settings: { model: "openai/gpt-6-sol", reasoningEffort: "none" },
         },
       ],
     });
@@ -573,11 +573,11 @@ describe("LinearIntegrationSettings harness", () => {
     expect(within(row).queryByText(/Sessions using this default model will be refused/)).toBeNull();
 
     setupSWR({
-      settings: { defaults: { harness: "codex", model: "openai/gpt-5.6-sol" } },
+      settings: { defaults: { harness: "codex", model: "openai/gpt-6-sol" } },
       overrides: [
         {
           repo: "acme/web",
-          settings: { model: "openai/gpt-5.6-sol", reasoningEffort: "none" },
+          settings: { model: "openai/gpt-6-sol", reasoningEffort: "none" },
         },
       ],
     });
@@ -587,7 +587,7 @@ describe("LinearIntegrationSettings harness", () => {
     expect(
       within(row).getByText(/Sessions using this default model will be refused/)
     ).toHaveTextContent(
-      'Reasoning effort "none" cannot run on openai/gpt-5.6-sol with the Codex harness.'
+      'Reasoning effort "none" cannot run on openai/gpt-6-sol with the Codex harness.'
     );
 
     fireEvent.click(within(row).getByRole("checkbox", { name: "Tool updates" }));
@@ -595,7 +595,7 @@ describe("LinearIntegrationSettings harness", () => {
     await waitFor(() => expect(mutateMock).toHaveBeenCalledWith(repoKey));
     const body = JSON.parse(String(vi.mocked(browserApiFetch).mock.calls[0][1]?.body));
     expect(body.settings).toMatchObject({
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6-sol",
       reasoningEffort: "none",
     });
   });
@@ -702,7 +702,7 @@ describe("LinearIntegrationSettings harness", () => {
       "Use system default",
       "Claude Sonnet 4.6",
       "GPT 6 Sol",
-      "GPT 5.6 Sol",
+      "GPT-6.2 Astra",
     ]);
     await user.click(model);
     await user.click(await screen.findByRole("option", { name: "Use system default" }));
@@ -716,7 +716,7 @@ describe("LinearIntegrationSettings harness", () => {
       "Use global model",
       "Claude Sonnet 4.6",
       "GPT 6 Sol",
-      "GPT 5.6 Sol",
+      "GPT-6.2 Astra",
     ]);
     fireEvent.click(within(row).getByRole("checkbox", { name: "Tool updates" }));
     await user.click(within(row).getByRole("button", { name: "Save" }));

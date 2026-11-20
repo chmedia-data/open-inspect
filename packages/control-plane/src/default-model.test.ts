@@ -8,7 +8,7 @@ describe("resolveDefaultModel", () => {
   });
 
   it("returns a configured catalog model in canonical form", () => {
-    expect(resolveDefaultModel({ DEFAULT_MODEL: "openai/gpt-5.5" })).toBe("openai/gpt-5.5");
+    expect(resolveDefaultModel({ DEFAULT_MODEL: "openai/gpt-6.2-sol" })).toBe("openai/gpt-6.2-sol");
     expect(resolveDefaultModel({ DEFAULT_MODEL: " claude-opus-4-8 " })).toBe(
       "anthropic/claude-opus-4-8"
     );
@@ -24,10 +24,10 @@ describe("resolveDefaultModel", () => {
 describe("warnIfDefaultModelDisabled", () => {
   it("warns, and keeps the default, when it is not enabled", () => {
     const log = { warn: vi.fn() };
-    expect(warnIfDefaultModelDisabled("openai/gpt-5.5", [DEFAULT_MODEL], log)).toBe(true);
+    expect(warnIfDefaultModelDisabled("openai/gpt-6.2-sol", [DEFAULT_MODEL], log)).toBe(true);
     expect(log.warn).toHaveBeenCalledWith("default_model.not_enabled", {
       event: "default_model.not_enabled",
-      default_model: "openai/gpt-5.5",
+      default_model: "openai/gpt-6.2-sol",
     });
   });
 

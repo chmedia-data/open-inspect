@@ -16,11 +16,11 @@ const TURN_PLAN = {
     reasoningEffort: "high" as const,
   },
   promptOverrides: {
-    model: "openai/gpt-5.6-sol" as const,
+    model: "openai/gpt-6.2-astra" as const,
     reasoningEffort: "high" as const,
   },
   effective: {
-    model: "openai/gpt-5.6-sol" as const,
+    model: "openai/gpt-6.2-astra" as const,
     reasoningEffort: "high" as const,
   },
 };
@@ -129,7 +129,7 @@ describe("pending request store", () => {
       ...request(),
       turnPlan: {
         ...TURN_PLAN,
-        effective: { model: "openai/gpt-5.4", reasoningEffort: "high" },
+        effective: { model: "openai/gpt-6.1-terra", reasoningEffort: "high" },
       },
     },
   ])("rejects malformed records: %j", async (record) => {
@@ -144,7 +144,7 @@ describe("pending request store", () => {
       userId: "U123",
       messageTs: "222.000003",
       threadContextSource: { threadTs: "111.222", beforeTs: "222.000003" },
-      inlinePromptOptions: { model: "openai/gpt-5.6-sol", reasoningEffort: "high" },
+      inlinePromptOptions: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
     };
     mocks.get.mockResolvedValue(legacy);
 

@@ -116,7 +116,7 @@ describe("updateUserPreferences", () => {
       "user_prefs:U123",
       JSON.stringify({
         userId: "U123",
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-6.1-terra",
         updatedAt: 1,
       })
     );
@@ -124,7 +124,7 @@ describe("updateUserPreferences", () => {
     await updateUserPreferences(env, "U123", { branch: "feature/test" });
 
     const prefs = await getUserPreferences(env, "U123");
-    expect(prefs?.model).toBe("openai/gpt-5.4");
+    expect(prefs?.model).toBe("openai/gpt-6.1-terra");
     expect(prefs?.branch).toBe("feature/test");
   });
 
@@ -144,7 +144,7 @@ describe("updateUserPreferences", () => {
       "U123",
       { branch: "feature/test" },
       {
-        defaultModel: "openai/gpt-5.4",
+        defaultModel: "openai/gpt-6.1-terra",
       }
     );
 
@@ -162,7 +162,7 @@ describe("updateUserPreferences", () => {
       "U123",
       { reasoningEffort: "none" },
       {
-        defaultModel: "openai/gpt-5.4",
+        defaultModel: "openai/gpt-6.1-terra",
       }
     );
 
@@ -177,7 +177,7 @@ describe("updateUserPreferences", () => {
       "user_prefs:U123",
       JSON.stringify({
         userId: "U123",
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-6.1-terra",
         reasoningEffort: "none",
         updatedAt: 1,
       })
@@ -186,7 +186,7 @@ describe("updateUserPreferences", () => {
     await updateUserPreferences(env, "U123", { branch: "feature/test", harness: "claude" });
 
     expect(await getUserPreferences(env, "U123")).toEqual(
-      expect.objectContaining({ model: "openai/gpt-5.4", reasoningEffort: "none" })
+      expect.objectContaining({ model: "openai/gpt-6.1-terra", reasoningEffort: "none" })
     );
   });
 });
@@ -229,7 +229,7 @@ describe("resolveUserPreferences", () => {
     expect(resolved.modelOrigin).toBe("app-home");
   });
 
-  it.each(["openai/gpt-5.4", undefined])(
+  it.each(["openai/gpt-6.1-terra", undefined])(
     "uses default %s for unsupported stored models",
     (defaultModel) => {
       const resolved = resolveUserPreferences(
@@ -278,13 +278,13 @@ describe("resolveUserPreferences", () => {
     const resolved = resolveUserPreferences(
       {
         userId: "U123",
-        model: "gpt-5.4",
+        model: "gpt-6.1-terra",
         updatedAt: 1,
       },
       "anthropic/claude-sonnet-4-6"
     );
 
-    expect(resolved.model).toBe("openai/gpt-5.4");
+    expect(resolved.model).toBe("openai/gpt-6.1-terra");
   });
 
   it("validates stored reasoning effort against the resolved Slack default model", () => {
@@ -294,10 +294,10 @@ describe("resolveUserPreferences", () => {
         reasoningEffort: "none",
         updatedAt: 1,
       },
-      "openai/gpt-5.4"
+      "openai/gpt-6.1-terra"
     );
 
-    expect(resolved.model).toBe("openai/gpt-5.4");
+    expect(resolved.model).toBe("openai/gpt-6.1-terra");
     expect(resolved.reasoningEffort).toBe("none");
   });
 });

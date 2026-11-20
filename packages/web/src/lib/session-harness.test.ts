@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_MODEL, type ModelCategory } from "@open-inspect/shared/models";
 import { filterModelOptionsForHarness, resolveHarnessModelSelection } from "./session-harness";
 
-const OPENAI_MODEL = "openai/gpt-5.4";
+const NON_CODEX_MODEL = "xai/grok-4.6";
 const options: ModelCategory[] = [
   { category: "Anthropic", models: [{ id: DEFAULT_MODEL, name: "Default", description: "" }] },
-  { category: "OpenAI", models: [{ id: OPENAI_MODEL, name: "GPT-5.4", description: "" }] },
+  { category: "xAI", models: [{ id: NON_CODEX_MODEL, name: "Grok 4.6", description: "" }] },
 ];
 
 describe("filterModelOptionsForHarness", () => {
@@ -19,20 +19,20 @@ describe("resolveHarnessModelSelection", () => {
   it("holds submission while the enabled set loads and keeps the preference for display", () => {
     const selection = resolveHarnessModelSelection({
       harness: "claude",
-      preference: { model: OPENAI_MODEL },
+      preference: { model: NON_CODEX_MODEL },
       enabledModels: [],
       enabledModelOptions: [],
       loading: true,
     });
     expect(selection.availability).toEqual({ status: "loading" });
-    expect(selection.model).toBe(OPENAI_MODEL);
+    expect(selection.model).toBe(NON_CODEX_MODEL);
   });
 
   it("resolves a preference the harness cannot run to an enabled model it can", () => {
     const selection = resolveHarnessModelSelection({
       harness: "claude",
-      preference: { model: OPENAI_MODEL },
-      enabledModels: [OPENAI_MODEL, DEFAULT_MODEL],
+      preference: { model: NON_CODEX_MODEL },
+      enabledModels: [NON_CODEX_MODEL, DEFAULT_MODEL],
       enabledModelOptions: options,
       loading: false,
     });
@@ -44,8 +44,8 @@ describe("resolveHarnessModelSelection", () => {
   it("reports an empty compatible set instead of falling back to a hidden model", () => {
     const selection = resolveHarnessModelSelection({
       harness: "claude",
-      preference: { model: OPENAI_MODEL },
-      enabledModels: [OPENAI_MODEL],
+      preference: { model: NON_CODEX_MODEL },
+      enabledModels: [NON_CODEX_MODEL],
       enabledModelOptions: [options[1]],
       loading: false,
     });
@@ -72,8 +72,8 @@ describe("Codex model selection", () => {
   });
   const request = {
     harness: "codex" as const,
-    preference: { model: "openai/gpt-5.6-sol", reasoningEffort: "max" },
-    enabledModels: ["openai/gpt-5.6-sol"],
+    preference: { model: "openai/gpt-6.2-astra", reasoningEffort: "max" },
+    enabledModels: ["openai/gpt-6.2-astra"],
     enabledModelOptions: [],
     loading: false,
   };
@@ -87,7 +87,7 @@ describe("Codex model selection", () => {
     expect(
       resolveHarnessModelSelection({
         ...request,
-        enabledModels: ["openai/gpt-5.4"],
+        enabledModels: ["xai/grok-4.6"],
       }).availability.status
     ).toBe("unavailable");
   });

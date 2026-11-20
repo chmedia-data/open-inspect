@@ -213,10 +213,10 @@ it("renders the existing not-found path before cached session content or action 
 it.each([undefined, "high"])(
   "uses Codex fallback without overwriting explicit effort %s",
   (effort) => {
-    mocks.enabledModels = ["openai/gpt-5.6-sol", "openai/gpt-6.1-sol"];
+    mocks.enabledModels = ["openai/gpt-6.2-astra", "openai/gpt-6.1-sol"];
     Object.assign(mocks.snapshot!.session, {
       harness: "codex",
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       reasoningEffort: effort,
     });
     mocks.socket.mockReturnValue({

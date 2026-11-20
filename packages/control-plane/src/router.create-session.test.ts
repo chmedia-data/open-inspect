@@ -233,18 +233,18 @@ describe("Codex public session creation", () => {
     });
     const initFetch = vi.fn(async (_request: Request) => Response.json({ status: "created" }));
     const response = await createSessionRequestWithBody(
-      { ...createEnv(initFetch), DEFAULT_MODEL: "openai/gpt-5.5" },
+      { ...createEnv(initFetch), DEFAULT_MODEL: "openai/gpt-6.2-sol" },
       { harness: "opencode" }
     );
     expect(response.status).toBe(201);
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ model: "openai/gpt-5.5" }));
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ model: "openai/gpt-6.2-sol" }));
     const payload = await initFetch.mock.calls[0][0].json();
-    expect(payload).toMatchObject({ harness: "opencode", model: "openai/gpt-5.5" });
+    expect(payload).toMatchObject({ harness: "opencode", model: "openai/gpt-6.2-sol" });
   });
 
   it.each(SANDBOX_PROVIDER_NAMES)("admits Codex on the %s sandbox provider", async (provider) => {
     vi.spyOn(ModelPreferencesStore.prototype, "getEnabledModels").mockResolvedValue([
-      "openai/gpt-5.6-sol",
+      "openai/gpt-6.2-astra",
     ]);
     const create = vi.fn().mockResolvedValue(undefined);
     vi.mocked(SessionIndexStore).mockImplementation(function () {
@@ -255,7 +255,7 @@ describe("Codex public session creation", () => {
       { ...createEnv(initFetch), SANDBOX_PROVIDER: provider },
       {
         harness: "codex",
-        model: "gpt-5.6-sol",
+        model: "gpt-6.2-astra",
         reasoningEffort: "max",
         providerSelections: { openai: { mode: "api_key" } },
       }
@@ -264,14 +264,14 @@ describe("Codex public session creation", () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         harness: "codex",
-        model: "openai/gpt-5.6-sol",
+        model: "openai/gpt-6.2-astra",
         reasoningEffort: "max",
       })
     );
     const payload = await initFetch.mock.calls[0][0].json();
     expect(payload).toMatchObject({
       harness: "codex",
-      model: "openai/gpt-5.6-sol",
+      model: "openai/gpt-6.2-astra",
       reasoningEffort: "max",
     });
   });

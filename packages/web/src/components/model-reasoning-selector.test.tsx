@@ -33,13 +33,13 @@ const items = [
     category: "OpenAI",
     models: [
       {
-        id: "openai/gpt-5.6-sol",
-        name: "GPT 5.6 Sol",
+        id: "openai/gpt-6.2-astra",
+        name: "GPT-6.2 Astra",
         description: "Frontier model",
       },
       {
-        id: "openai/gpt-5.5",
-        name: "GPT 5.5",
+        id: "openai/gpt-6.2-sol",
+        name: "GPT-6.2 Sol",
         description: "Latest flagship model",
       },
     ],
@@ -193,7 +193,7 @@ describe("ModelReasoningSelector", () => {
 
     rerender(
       <ModelReasoningSelector
-        selectedModel="openai/gpt-5.6-sol"
+        selectedModel="openai/gpt-6.2-astra"
         reasoningEffort={undefined}
         items={items}
         onModelChange={vi.fn()}
@@ -202,7 +202,7 @@ describe("ModelReasoningSelector", () => {
     );
 
     const trigger = screen.getByRole("button", { name: /model and effort/i });
-    expect(trigger).toHaveTextContent("gpt 5.6 solMedium");
+    expect(trigger).toHaveTextContent("gpt-6.2 astraMedium");
     fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
     const effortMenu = await screen.findByRole("menuitem", { name: /effort.*medium/i });
     effortMenu.focus();
@@ -217,7 +217,7 @@ describe("ModelReasoningSelector", () => {
     const onReasoningEffortChange = vi.fn();
     const { rerender } = render(
       <ModelReasoningSelector
-        selectedModel="openai/gpt-5.5"
+        selectedModel="openai/gpt-6.2-sol"
         reasoningEffort="high"
         items={items}
         onModelChange={vi.fn()}
@@ -235,7 +235,7 @@ describe("ModelReasoningSelector", () => {
 
     rerender(
       <ModelReasoningSelector
-        selectedModel="openai/gpt-5.5"
+        selectedModel="openai/gpt-6.2-sol"
         reasoningEffort={undefined}
         items={items}
         onModelChange={vi.fn()}
@@ -243,7 +243,7 @@ describe("ModelReasoningSelector", () => {
       />
     );
     expect(screen.getByRole("button", { name: /model and effort/i })).toHaveTextContent(
-      "gpt 5.5Default"
+      "gpt-6.2 solMedium"
     );
   });
 
@@ -280,7 +280,7 @@ it("offers Codex in the mobile agent picker", async () => {
   const change = vi.fn();
   render(
     <ModelReasoningSelector
-      selectedModel="openai/gpt-5.6-sol"
+      selectedModel="openai/gpt-6.2-astra"
       reasoningEffort="max"
       items={items}
       onModelChange={vi.fn()}

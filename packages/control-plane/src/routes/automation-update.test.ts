@@ -1013,13 +1013,13 @@ describe("automation read, update, and delete routes", () => {
       mockStore.getById.mockResolvedValue({ ...sampleRow, reasoning_effort: "max" });
 
       const res = await callRoute("PUT", "/automations/auto-1", {
-        body: { model: "openai/gpt-5.4" },
+        body: { model: "xai/grok-4.6" },
       });
 
       expect(res.status).toBe(200);
       expect(mockStore.bindAutomationUpdate).toHaveBeenCalledWith(
         "auto-1",
-        expect.objectContaining({ model: "openai/gpt-5.4", reasoning_effort: null })
+        expect.objectContaining({ model: "xai/grok-4.6", reasoning_effort: null })
       );
     });
 

@@ -333,7 +333,7 @@ describe("resolveModelSelection harness", () => {
       env,
       log,
       "trace-mismatch",
-      { model: "openai/gpt-5.4", harness: "claude", reasoningEffort: null },
+      { model: "openai/gpt-6.1-terra", harness: "claude", reasoningEffort: null },
       undefined
     );
 
@@ -341,7 +341,7 @@ describe("resolveModelSelection harness", () => {
       ok: false,
       reason: "harness_model_incompatible",
       message: expect.stringContaining(
-        'Model "openai/gpt-5.4" cannot run on the Claude Agent harness.'
+        'Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness.'
       ),
     });
     expect(log.warn).not.toHaveBeenCalled();
@@ -363,14 +363,14 @@ describe("resolveModelSelection harness", () => {
   });
 
   it.each([
-    { model: "gpt-5.4", harness: "claude", compatible: false, canonical: "openai/gpt-5.4" },
+    { model: "gpt-6.1-terra", harness: "claude", compatible: false, canonical: "openai/gpt-6.1-terra" },
     {
       model: "claude-opus-4-6",
       harness: "claude",
       compatible: true,
       canonical: "anthropic/claude-opus-4-6",
     },
-    { model: "gpt-5.4", harness: "opencode", compatible: true, canonical: "openai/gpt-5.4" },
+    { model: "gpt-6.1-terra", harness: "opencode", compatible: true, canonical: "openai/gpt-6.1-terra" },
   ] as const)(
     "checks $harness against inline model override $model",
     async ({ model, harness, compatible, canonical }) => {
@@ -378,7 +378,7 @@ describe("resolveModelSelection harness", () => {
       const inlineEnv = createMockEnv(() =>
         Promise.resolve(
           Response.json({
-            enabledModels: ["openai/gpt-5.4", "anthropic/claude-opus-4-6"],
+            enabledModels: ["openai/gpt-6.1-terra", "anthropic/claude-opus-4-6"],
           })
         )
       );

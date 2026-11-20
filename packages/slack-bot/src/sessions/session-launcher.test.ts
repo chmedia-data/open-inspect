@@ -64,10 +64,10 @@ const actor: SlackActorIdentity = {
 };
 const launchSettings: SlackLaunchSettings = {
   modelSource: "app-home",
-  enabledModels: ["openai/gpt-5.4"],
+  enabledModels: ["openai/gpt-6.1-terra"],
   slackConfig: { harness: "opencode" },
   userPreferences: {
-    model: "openai/gpt-5.4",
+    model: "openai/gpt-6.1-terra",
     modelOrigin: "app-home",
     reasoningEffort: "high",
     branch: "user-default-branch",
@@ -168,7 +168,7 @@ describe("startSessionAndSendPrompt team boundaries", () => {
       expect(buildThreadSession).toHaveBeenCalledWith(
         "session-1",
         target,
-        "openai/gpt-5.4",
+        "openai/gpt-6.1-terra",
         "high",
         undefined,
         teamId
@@ -185,7 +185,7 @@ describe("startSessionAndSendPrompt team boundaries", () => {
 
 describe("startSessionAndSendPrompt harness", () => {
   const anthropicModel = "anthropic/claude-haiku-4-5";
-  const openAIModel = "openai/gpt-5.4";
+  const openAIModel = "openai/gpt-6.1-terra";
 
   function settings(harness: HarnessId, preferredModel: string): SlackLaunchSettings {
     return {
@@ -235,7 +235,7 @@ describe("startSessionAndSendPrompt harness", () => {
     expect(postMessage).toHaveBeenCalledWith(
       env.SLACK_BOT_TOKEN,
       "C123",
-      'Model "openai/gpt-5.4" cannot run on the Claude Agent harness. Start your request with `!model` and a model Claude Agent can run, or change your model or agent harness in the Slack app\'s Home tab.',
+      'Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness. Start your request with `!model` and a model Claude Agent can run, or change your model or agent harness in the Slack app\'s Home tab.',
       { thread_ts: "111.222" }
     );
   });
@@ -276,7 +276,7 @@ describe("startSessionAndSendPrompt harness", () => {
             ...settings("opencode", anthropicModel),
             enabledModels: [anthropicModel],
           },
-          launchPlan: { sessionDefaults: { model: "openai/gpt-5.6-sol", reasoningEffort } },
+          launchPlan: { sessionDefaults: { model: "openai/gpt-6.2-astra", reasoningEffort } },
         })
       ).toBeNull();
 

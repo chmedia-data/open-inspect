@@ -185,7 +185,7 @@ describe("POST /events", () => {
     const env = makeSessionEnv([], { enabledModels: ["anthropic/claude-haiku-4-5"] });
     await env.SLACK_KV.put(
       "user_prefs:U123",
-      JSON.stringify({ userId: "U123", model: "openai/gpt-5.5", updatedAt: 1 })
+      JSON.stringify({ userId: "U123", model: "openai/gpt-6.2-sol", updatedAt: 1 })
     );
     const ctx = makeCtx();
 
@@ -203,7 +203,7 @@ describe("POST /events", () => {
         elements: [
           {
             type: "mrkdwn",
-            text: "Your model `openai/gpt-5.5` is no longer enabled, so new requests are refused until you choose a model above.",
+            text: "Your model `openai/gpt-6.2-sol` is no longer enabled, so new requests are refused until you choose a model above.",
           },
         ],
       })
@@ -1669,7 +1669,7 @@ describe("POST /events", () => {
         sessionId: "session-1",
         repoId: "acme/app",
         repoFullName: "acme/app",
-        model: "openai/gpt-5.6-sol",
+        model: "openai/gpt-6.2-astra",
         reasoningEffort: "xhigh",
         createdAt: Date.now(),
       })
@@ -1699,7 +1699,7 @@ describe("POST /events", () => {
       expect.objectContaining({
         reasoningEffort: "high",
         callbackContext: expect.objectContaining({
-          model: "openai/gpt-5.6-sol",
+          model: "openai/gpt-6.2-astra",
           reasoningEffort: "high",
         }),
       }),
@@ -1760,10 +1760,10 @@ describe("POST /events", () => {
 
   describe("agent harness and model availability", () => {
     const anthropicModel = "anthropic/claude-haiku-4-5";
-    const openAIModel = "openai/gpt-5.4";
+    const openAIModel = "openai/gpt-6.1-terra";
     const harnessRefusal = {
       prompt: {
-        error: 'Model "openai/gpt-5.4" cannot run on the Claude Agent harness.',
+        error: 'Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness.',
         code: "HARNESS_MODEL_INCOMPATIBLE",
       },
       promptStatus: 400,
@@ -1851,7 +1851,7 @@ describe("POST /events", () => {
       expect(sessionFetchBodies(env.CONTROL_PLANE.fetch)).toEqual([]);
       expect(postedTexts(slackFetch)).toEqual([
         "Starting work...",
-        'Model "openai/gpt-5.4" cannot run on the Claude Agent harness. Start your request with `!model` and a model Claude Agent can run, or change your model or agent harness in the Slack app\'s Home tab.',
+        'Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness. Start your request with `!model` and a model Claude Agent can run, or change your model or agent harness in the Slack app\'s Home tab.',
       ]);
     });
 
@@ -1882,8 +1882,8 @@ describe("POST /events", () => {
       expect(await env.SLACK_KV.get("thread:C123:111.222")).toBeNull();
       expect(postedTexts(slackFetch)).toContain(
         prefix
-          ? 'Your requested model "GPT 5.4" is no longer enabled. Start a new request with `!model` and an enabled model.'
-          : 'Your App Home model "GPT 5.4" is no longer enabled. Choose another model in the Slack app\'s Home tab, or start your request with `!model` and an enabled model.'
+          ? 'Your requested model "GPT-6.1 Terra" is no longer enabled. Start a new request with `!model` and an enabled model.'
+          : 'Your App Home model "GPT-6.1 Terra" is no longer enabled. Choose another model in the Slack app\'s Home tab, or start your request with `!model` and an enabled model.'
       );
       slackFetch.mockRestore();
     });
@@ -1985,7 +1985,7 @@ describe("POST /events", () => {
 
           expectedTexts.push(
             "Starting work...",
-            'Your requested model "GPT 5.4" is no longer enabled. Start a new request with `!model` and an enabled model.'
+            'Your requested model "GPT-6.1 Terra" is no longer enabled. Start a new request with `!model` and an enabled model.'
           );
           expect(postedTexts(slackFetch)).toEqual(expectedTexts);
           expect(sessionFetchBodies(env.CONTROL_PLANE.fetch)).toEqual([]);
@@ -2171,7 +2171,7 @@ describe("POST /events", () => {
         expect.objectContaining({ model: openAIModel }),
       ]);
       expect(postedTexts(slackFetch)).toEqual([
-        'Model "openai/gpt-5.4" cannot run on the Claude Agent harness. A thread keeps the harness its session started on. Reply without `!model`, or start a new thread to use that model.',
+        'Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness. A thread keeps the harness its session started on. Reply without `!model`, or start a new thread to use that model.',
       ]);
 
       slackFetch.mockRestore();
@@ -2179,9 +2179,9 @@ describe("POST /events", () => {
 
     it.each([
       ["an Anthropic thread", "anthropic/claude-sonnet-4-6", "!reasoning high "],
-      ["a GPT thread", "openai/gpt-5.5", "!reasoning high "],
+      ["a GPT thread", "openai/gpt-6.2-sol", "!reasoning high "],
       ["an Anthropic thread", "anthropic/claude-sonnet-4-6", ""],
-      ["a GPT thread", "openai/gpt-5.5", ""],
+      ["a GPT thread", "openai/gpt-6.2-sol", ""],
     ] as const)(
       "keeps the disabled model of %s (%s) on a '%s' follow-up with Claude Agent configured",
       async (_case, sessionModel, prefix) => {
@@ -3112,8 +3112,8 @@ describe("POST /interactions", () => {
     mockPublishView.mockResolvedValue({ ok: true });
     const slackFetch = mockSlackFetch();
     const env = makeSessionEnv([], {
-      slackDefaults: { model: "openai/gpt-5.4" },
-      enabledModels: ["anthropic/claude-haiku-4-5", "openai/gpt-5.4"],
+      slackDefaults: { model: "openai/gpt-6.1-terra" },
+      enabledModels: ["anthropic/claude-haiku-4-5", "openai/gpt-6.1-terra"],
     });
     const kv = env.SLACK_KV as unknown as {
       get: (key: string, type: string) => Promise<unknown>;
@@ -3226,7 +3226,7 @@ describe("POST /interactions", () => {
     const slackFetch = mockSlackFetch();
     const env = makeSessionEnv([], {
       slackDefaults: { harness: "claude" },
-      enabledModels: ["anthropic/claude-haiku-4-5", "openai/gpt-5.4"],
+      enabledModels: ["anthropic/claude-haiku-4-5", "openai/gpt-6.1-terra"],
     });
     const kv = env.SLACK_KV as unknown as { put: (k: string, v: string) => Promise<void> };
     await kv.put(
@@ -3235,7 +3235,7 @@ describe("POST /interactions", () => {
     );
     await kv.put(
       "user_prefs:U123",
-      JSON.stringify({ userId: "U123", model: "openai/gpt-5.4", updatedAt: 1 })
+      JSON.stringify({ userId: "U123", model: "openai/gpt-6.1-terra", updatedAt: 1 })
     );
     const ctx = makeCtx();
 
@@ -3257,7 +3257,7 @@ describe("POST /interactions", () => {
     expect(sessionFetchBodies(env.CONTROL_PLANE.fetch)).toEqual([]);
     expect(slackApiBodies(slackFetch, "chat.postMessage")).toContainEqual(
       expect.objectContaining({
-        text: 'Model "openai/gpt-5.4" cannot run on the Claude Agent harness. Start your request with `!model` and a model Claude Agent can run, or change your model or agent harness in the Slack app\'s Home tab.',
+        text: 'Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness. Start your request with `!model` and a model Claude Agent can run, or change your model or agent harness in the Slack app\'s Home tab.',
       })
     );
 
@@ -3270,7 +3270,7 @@ describe("POST /interactions", () => {
     const pending = {
       message: "Please handle this",
       userId: "U123",
-      launchPlan: { sessionDefaults: { model: "openai/gpt-5.4", reasoningEffort: "high" } },
+      launchPlan: { sessionDefaults: { model: "openai/gpt-6.1-terra", reasoningEffort: "high" } },
     };
     await env.SLACK_KV.put("pending:C123:111.222", JSON.stringify(pending));
     const ctx = makeCtx();
@@ -3296,7 +3296,7 @@ describe("POST /interactions", () => {
     expect(await env.SLACK_KV.get("pending:C123:111.222", "json")).toEqual(pending);
     expect(slackApiBodies(slackFetch, "chat.postMessage")).toContainEqual(
       expect.objectContaining({
-        text: 'Your requested model "GPT 5.4" is no longer enabled. Start a new request with `!model` and an enabled model.',
+        text: 'Your requested model "GPT-6.1 Terra" is no longer enabled. Start a new request with `!model` and an enabled model.',
         thread_ts: "111.222",
       })
     );

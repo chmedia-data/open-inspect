@@ -3,22 +3,25 @@ import { getReasoningConfig } from "@open-inspect/shared/models";
 import { resolveModelPreference } from "./model-selection";
 import { resolveHarnessModelSelection } from "./session-harness";
 
-const MODEL = "openai/gpt-5.6-sol";
+const MODEL = "openai/gpt-6.2-astra";
 
 describe("harness-aware reasoning preference", () => {
-  it("keeps a Codex-only effort that the generic catalog does not offer", () => {
-    expect(getReasoningConfig(MODEL)?.efforts).not.toContain("max");
+  it("keeps an effort the harness supports", () => {
     expect(
       resolveModelPreference({ model: MODEL, reasoningEffort: "max" }, undefined, "codex")
         .reasoningEffort
     ).toBe("max");
   });
 
-  it("still replaces an effort the harness cannot run with that harness's default", () => {
+  it("replaces an effort only the generic catalog offers with the harness default", () => {
+    expect(getReasoningConfig("openai/gpt-6-sol")?.efforts).toContain("none");
     expect(
-      resolveModelPreference({ model: MODEL, reasoningEffort: "max" }, undefined, "opencode")
-        .reasoningEffort
-    ).toBe(getReasoningConfig(MODEL)?.default);
+      resolveModelPreference(
+        { model: "openai/gpt-6-sol", reasoningEffort: "none" },
+        undefined,
+        "codex"
+      ).reasoningEffort
+    ).toBe("medium");
   });
 
   it("carries the Codex selection through the composer's model selection", () => {

@@ -396,9 +396,9 @@ describe("IntegrationSettingsStore", () => {
     it("rejects an incompatible harness/model pair on setGlobal", async () => {
       await expect(
         store.setGlobal("github", {
-          defaults: { harness: "claude", model: "openai/gpt-5.4" },
+          defaults: { harness: "claude", model: "openai/gpt-6.1-terra" },
         })
-      ).rejects.toThrow('Model "openai/gpt-5.4" cannot run on the Claude Agent harness.');
+      ).rejects.toThrow('Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness.');
     });
 
     it("rejects malformed stored global settings", async () => {
@@ -979,10 +979,10 @@ describe("IntegrationSettingsStore", () => {
         await store.setGlobal(integrationId, {
           defaults: { harness: "claude", model: "anthropic/claude-sonnet-4-6" },
         });
-        await store.setRepoSettings(integrationId, "acme/widgets", { model: "openai/gpt-5.5" });
+        await store.setRepoSettings(integrationId, "acme/widgets", { model: "openai/gpt-6.2-sol" });
         expect((await store.getResolvedConfig(integrationId, "acme/widgets")).settings).toEqual({
           harness: "claude",
-          model: "openai/gpt-5.5",
+          model: "openai/gpt-6.2-sol",
         });
       });
     });
@@ -1435,9 +1435,9 @@ describe("IntegrationSettingsStore", () => {
     it("rejects a global slack harness saved with a model it cannot run", async () => {
       await expect(
         store.setGlobal("slack", {
-          defaults: { harness: "claude", model: "openai/gpt-5.4" },
+          defaults: { harness: "claude", model: "openai/gpt-6.1-terra" },
         })
-      ).rejects.toThrow('Model "openai/gpt-5.4" cannot run on the Claude Agent harness.');
+      ).rejects.toThrow('Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness.');
     });
 
     it("requires a default model for a global slack harness limited to some models", async () => {
