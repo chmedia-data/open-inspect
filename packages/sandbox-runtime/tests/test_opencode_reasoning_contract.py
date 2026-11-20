@@ -15,7 +15,9 @@ GPT-6.1 Sol added from the 2026-09-29 retrieval.
 Source SHA-256: e4677e698a53d3b8b11c569c0ecc2f5722cd8126677bf5f7dbff23daf942a17b
 GPT-6.1 Terra added from the 2026-11-04 retrieval.
 Source SHA-256: 3c98c4ea4ce2fc866e8f7cf858f7c79ce96d12aa190b6f26b9af77b448519b02
-Subset SHA-256: fbc59c3d17de9575cd489fd67a4f6da4e9c73caa971d1738fc3b968cb5ffb52b
+GPT-6.2 Astra and Sol added from the 2026-11-20 retrieval.
+Source SHA-256: 93be3a1c7515ebd1704a87811cd47905187123b8eee1fa9a1d1eefcc151c1d5e
+Subset SHA-256: 6d647ba7ac2cd9b8e3dbb8f700fbbc505969326aa73b42b7a3497ec530befaef
 Reconcile this frozen fixture with shared model/effort definitions when changing
 models or the binary. Mocks verify serialization, not live provider acceptance.
 """
