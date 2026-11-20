@@ -83,7 +83,7 @@ run "overrides_reach_each_bot_binding" {
 
   variables {
     github_bot_default_model = "anthropic/claude-opus-4-5"
-    slack_bot_default_model  = "openai/gpt-5.4"
+    slack_bot_default_model  = "openai/gpt-6.2-sol"
     linear_bot_default_model = "claude-sonnet-5"
   }
 
@@ -93,7 +93,7 @@ run "overrides_reach_each_bot_binding" {
   }
 
   assert {
-    condition     = module.slack_bot_worker[0].plain_text_bindings["DEFAULT_MODEL"] == "openai/gpt-5.4"
+    condition     = module.slack_bot_worker[0].plain_text_bindings["DEFAULT_MODEL"] == "openai/gpt-6.2-sol"
     error_message = "An overridden slack_bot_default_model must reach the Slack bot's DEFAULT_MODEL binding."
   }
 

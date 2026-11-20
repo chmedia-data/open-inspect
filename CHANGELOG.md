@@ -2,6 +2,14 @@
 
 New features, integrations, and notable improvements to Open-Inspect — newest first.
 
+## November 20, 2026
+
+**GPT-6.2, and GPT 5.x retired.** GPT-6.2 Astra and GPT-6.2 Sol join the OpenAI group on OpenCode
+and Codex, and as Bedrock global profiles on OpenCode. GPT 5.4, 5.5, 5.6 Sol, 5.6 Terra, 5.6 Luna
+and Bedrock GPT-5.6 Sol leave the picker. Sessions, saved defaults, bot settings and automations
+that still name one resolve to a GPT-6 successor; see
+[Using OpenAI Models](docs/OPENAI_MODELS.md#supported-models).
+
 ## November 17, 2026
 
 **Configurable default model.** Set `DEFAULT_MODEL` on the control plane (`.env` on a Node host,

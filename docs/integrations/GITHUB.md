@@ -99,7 +99,7 @@ Start the request with `!model` or `!reasoning` to override the configured model
 for the session that comment starts:
 
 ```text
-@my-app[bot] !model openai/gpt-5.6-sol !reasoning high investigate the flaky test
+@my-app[bot] !model openai/gpt-6.2-sol !reasoning high investigate the flaky test
 ```
 
 The flags use the same syntax as Slack: each accepts a space or colon before its value (such as
