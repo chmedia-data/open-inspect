@@ -35,14 +35,16 @@ describe("resolveInlinePromptOptions", () => {
   });
 
   it("normalizes bare model ids and preserves a compatible default effort", () => {
-    expect(resolveInlinePromptOptions({ model: "gpt-6.2-astra" }, defaults, enabledModels)).toEqual({
-      ok: true,
-      turnPlan: {
-        sessionDefaults,
-        promptOverrides: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
-        effective: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
-      },
-    });
+    expect(resolveInlinePromptOptions({ model: "gpt-6.2-astra" }, defaults, enabledModels)).toEqual(
+      {
+        ok: true,
+        turnPlan: {
+          sessionDefaults,
+          promptOverrides: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
+          effective: { model: "openai/gpt-6.2-astra", reasoningEffort: "high" },
+        },
+      }
+    );
   });
 
   it("keeps a disabled session model when applying a reasoning override", () => {

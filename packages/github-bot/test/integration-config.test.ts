@@ -363,14 +363,24 @@ describe("resolveModelSelection harness", () => {
   });
 
   it.each([
-    { model: "gpt-6.1-terra", harness: "claude", compatible: false, canonical: "openai/gpt-6.1-terra" },
+    {
+      model: "gpt-6.1-terra",
+      harness: "claude",
+      compatible: false,
+      canonical: "openai/gpt-6.1-terra",
+    },
     {
       model: "claude-opus-4-6",
       harness: "claude",
       compatible: true,
       canonical: "anthropic/claude-opus-4-6",
     },
-    { model: "gpt-6.1-terra", harness: "opencode", compatible: true, canonical: "openai/gpt-6.1-terra" },
+    {
+      model: "gpt-6.1-terra",
+      harness: "opencode",
+      compatible: true,
+      canonical: "openai/gpt-6.1-terra",
+    },
   ] as const)(
     "checks $harness against inline model override $model",
     async ({ model, harness, compatible, canonical }) => {

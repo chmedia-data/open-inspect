@@ -589,7 +589,9 @@ describe.each([
     const githubFetch = vi.fn().mockResolvedValue(new Response("", { status: 201 }));
     vi.stubGlobal("fetch", githubFetch);
 
-    expect(await run(env, createMockLogger(), "@test-bot[bot] !model:gpt-6.2-astra fix it")).toEqual({
+    expect(
+      await run(env, createMockLogger(), "@test-bot[bot] !model:gpt-6.2-astra fix it")
+    ).toEqual({
       outcome: "skipped",
       skip_reason: "harness_model_incompatible",
     });
@@ -598,7 +600,9 @@ describe.each([
     expect(postReaction).not.toHaveBeenCalled();
     expect(githubFetch).toHaveBeenCalledTimes(1);
     const comment = JSON.parse(githubFetch.mock.calls[0][1].body).body;
-    expect(comment).toContain('Model "openai/gpt-6.2-astra" cannot run on the Claude Agent harness.');
+    expect(comment).toContain(
+      'Model "openai/gpt-6.2-astra" cannot run on the Claude Agent harness.'
+    );
     expect(comment).toContain("`!model`");
     expect(comment).toContain("default model");
     expect(comment).toContain("GitHub integration harness");
@@ -1553,7 +1557,9 @@ describe("integration config", () => {
       expect.objectContaining({ method: "POST" })
     );
     const comment = JSON.parse(githubFetch.mock.calls[0][1].body).body;
-    expect(comment).toContain('Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness.');
+    expect(comment).toContain(
+      'Model "openai/gpt-6.1-terra" cannot run on the Claude Agent harness.'
+    );
     expect(comment).toContain("`!model`");
     expect(comment).toContain("default model");
     expect(comment).toContain("GitHub integration harness");
