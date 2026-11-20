@@ -96,6 +96,11 @@ both modes. Any other plain-HTTP redirect is refused. Toggling the mode does not
 `auth_revision`: existing grants keep refreshing with their own client, and the next consent
 registers a new client because cached clients are matched on redirect URI.
 
+Issuer discovery follows RFC 9728 protected-resource metadata. When every probe answers 404 (as on
+Atlassian Rovo), the configured issuer is trusted only if it and the resource share the server URL's
+origin; the issuer's authorization-server metadata must still name it exactly, and the S256,
+endpoint-pinning and registration checks are unchanged. Any non-404 probe failure still fails.
+
 Consent is ephemeral: each connection retains at most its current pending/claimed attempt after
 publication. Settlement, failure, supersession, and disconnect delete verifier material.
 Reconnecting keeps a working grant usable until the new consent settles, which replaces it with a

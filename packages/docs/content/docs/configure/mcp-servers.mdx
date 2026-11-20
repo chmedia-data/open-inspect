@@ -80,9 +80,24 @@ A remote server uses one of three authentication modes, chosen under **Authentic
 
 A routed server must speak Streamable HTTP at a public HTTPS URL: no IP address, single-label or `localhost`, `.local`, or `.internal` hostname, credentials in the URL, fragment, or port other than 443. The hostname is checked as written; OpenInspect does not check the addresses it resolves to. Routed requests have per-sandbox rate and size limits; see [Limits](/reference/limits#mcp-servers).
 
-For **Each user's OAuth connection**, also enter the **OAuth issuer**. Leave **OAuth resource** blank: it defaults to the server URL, and connecting fails for any other value. When you change an existing server's URL, clear **OAuth resource** or set it to the new URL. The server must publish OAuth metadata that names that issuer and resource exactly, keep its token and registration endpoints on the issuer's origin and its authorization endpoint on the issuer's registrable domain (for example `foo.test` for an issuer at `api.foo.test`), and support dynamic client registration for a public client with S256 PKCE.
+For **Each user's OAuth connection**, also enter the **OAuth issuer**. Leave **OAuth resource** blank: it defaults to the server URL, and connecting fails for any other value. When you change an existing server's URL, clear **OAuth resource** or set it to the new URL. The server must publish OAuth metadata that names that issuer and resource exactly, keep its token and registration endpoints on the issuer's origin and its authorization endpoint on the issuer's registrable domain (for example `foo.test` for an issuer at `api.foo.test`), and support dynamic client registration for a public client with S256 PKCE. A server that publishes no protected-resource metadata (every lookup answers 404) is accepted only when the issuer is on the server URL's origin and the issuer's authorization-server metadata names it exactly, character for character, including any trailing slash.
 
 Some providers register clients only for `localhost` redirect URIs and refuse the web app's callback. For those, turn on **Use localhost redirect (paste-back)**. OpenInspect then registers and authorizes with the fixed redirect `http://localhost:33418/callback`, and users finish connecting by pasting that address back into settings; see [Personal connections](#personal-connections). Leave it off for every other server. Turning it on or off does not mark existing connections **Reconnect required**: they keep working, and the next **Connect** registers a new client for the new redirect. API clients set it with `"redirect": "loopback"` in the `oauth` object.
+
+### Atlassian Rovo
+
+Atlassian's Rovo MCP server accepts only `localhost` redirects unless an Atlassian organization admin allowlists your domain. To add it:
+
+| Field                               | Value                                  |
+| ----------------------------------- | -------------------------------------- |
+| Type                                | Remote                                 |
+| URL                                 | `https://mcp.atlassian.com/v1/mcp`     |
+| Authentication                      | Each user's OAuth connection           |
+| OAuth issuer                        | `https://mcp.atlassian.com` (no slash) |
+| OAuth resource                      | Leave blank                            |
+| Use localhost redirect (paste-back) | On                                     |
+
+Each user then connects under Settings › Connections with the paste-back flow and approves access at Atlassian. The connection acts with that user's Atlassian permissions.
 
 ## Saved credentials
 
